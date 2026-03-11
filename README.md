@@ -1,16 +1,31 @@
-# React + Vite
+# 📄✨ Explica Fácil
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Inteligência Artificial para descomplicar qualquer documento. Transforme contratos complexos, bulas de remédios e PDFs densos em explicações simples e diretas.
 
-Currently, two official plugins are available:
+## 🚀 Funcionalidades
+- **Autenticação Segura**: Login com Google + Verificação por E-mail (OTP).
+- **Multi-Formato**: Suporte para PDF, Imagens (OCR), Word (.docx) e Texto.
+- **Análise Inteligente**: Receba resumos, pontos importantes, riscos e glossário técnico.
+- **Modo Pular Verificação**: Atalho para testes rápidos sem depender de limites de e-mail.
+- **Design Premium**: Interface moderna com glassmorphism e micro-animações.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🛠️ Tecnologias
+- **Frontend**: React.js + Vite
+- **Backend/Auth**: Supabase
+- **Estilização**: Modern CSS
+- **Deploy**: Vercel
 
-## React Compiler
+## ⚙️ Configuração
+Para rodar localmente ou em produção, adicione as seguintes variáveis no seu arquivo `.env` ou no painel da Vercel:
+```env
+VITE_SUPABASE_URL=seu_url_do_supabase
+VITE_SUPABASE_ANON_KEY=sua_chave_anonima
+```
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+## 📦 Como rodar
+1. Instale as dependências: `npm install`
+2. Rode em desenvolvimento: `npm run dev`
+3. Faça o build de produção: `npm run build`
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+---
+Desenvolvido por **ApolloVerse** 🚀
