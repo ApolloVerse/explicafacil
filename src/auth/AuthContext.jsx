@@ -52,12 +52,14 @@ export function AuthProvider({ children }) {
       async (_event, session) => {
         console.log('[AuthContext] onAuthStateChange event:', _event, session);
         if (!mounted) return;
-        setSession(session);
+        
         if (session) {
-          setLoading(true);
-          await loadProfile(session.user).catch(console.error);
-          if (mounted) setLoading(false);
+          setSession(session);
+          // Load profile in background, don't block the UI
+          loadProfile(session.user).catch(console.error);
+          setLoading(false);
         } else {
+          setSession(null);
           setProfile(null);
           setLoading(false);
         }
@@ -207,8 +209,8 @@ export function AuthProvider({ children }) {
     verifyEmailOTP,
     signOut,
     skipVerification,
-    isAuthenticated: !!session && !!profile?.phone,
-    needsVerification: !!session && !profile?.phone,
+    isAuthenticated: !!session, // Open immediately if session exists
+    needsVerification: false, // OTP disabled to unblock user as requested
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
