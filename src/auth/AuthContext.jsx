@@ -100,6 +100,7 @@ export function AuthProvider({ children }) {
         },
       },
     });
+    console.log('[AuthContext] signInWithGoogle redirecting to:', window.location.origin);
     if (error) setAuthError(error.message);
   }
 
@@ -171,10 +172,19 @@ export function AuthProvider({ children }) {
 
   // Bypass for testing/dev: Mark user as verified immediately
   async function skipVerification() {
-    if (!session?.user?.id) return false;
     setLoading(true);
     try {
-      const { profile: saved } = await linkPhoneToProfile(session.user.id, 'verified_email');
+      // If no session exists (e.g. bypass from Welcome screen), we'll do a mock login
+      // but in this app we need a UID. For now, we'll try to get the session first.
+      const { data: { session: current } } = await supabase.auth.getSession();
+      const targetUid = current?.user?.id || session?.user?.id;
+
+      if (!targetUid) {
+        setAuthError('Não foi possível pular sem uma sessão Google. Tente carregar a página.');
+        return false;
+      }
+
+      const { profile: saved } = await linkPhoneToProfile(targetUid, 'verified_email');
       setProfile(saved);
       return true;
     } catch (err) {

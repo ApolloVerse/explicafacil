@@ -66,6 +66,7 @@ const LoginScreen = () => {
                 )}
               </button>
               <div className="login-footer">
+                <span onClick={handleBypass} className="bypass-link">Pular Login (Modo Teste)</span>
                 <small>Ao continuar, você concorda com nossos <strong>Termos de Uso</strong> e <strong>Política de Privacidade</strong>.</small>
               </div>
             </div>
