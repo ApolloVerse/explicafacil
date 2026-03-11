@@ -63,6 +63,7 @@ const Dashboard = () => {
   const [upgradingPlan, setUpgradingPlan] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [activeCategory, setActiveCategory] = useState(null);
+  const [activeTab, setActiveTab] = useState('home'); // For bottom nav
   const fileInputRef = useRef(null);
 
   const isPremium = profile?.plan === 'premium';
@@ -119,7 +120,6 @@ const Dashboard = () => {
     const result = analyzeDocument(inputText);
     if (result) {
       setAnalysisResult(result);
-      // Increment usage in Supabase
       const { profile: updated } = await incrementUsage(profile.id, usageCount);
       if (updated) setProfile(updated);
     }
@@ -142,7 +142,6 @@ const Dashboard = () => {
 
   const usagePercent = isPremium ? 5 : Math.min((usageCount / FREE_ANALYSIS_LIMIT) * 100, 100);
   const userName = session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || 'Usuário';
-  const userPhone = profile?.phone ? `📱 ${profile.phone}` : '';
 
   return (
     <div className="dashboard">
@@ -155,29 +154,28 @@ const Dashboard = () => {
           <div className="user-avatar">{userName[0]?.toUpperCase()}</div>
           <div className="user-info">
             <h3>Olá, {userName}</h3>
-            <p>{userPhone}</p>
+            <p>{profile?.plan === 'premium' ? 'Plano Premium ✨' : 'Plano Gratuito'}</p>
           </div>
         </div>
         <div className="header-right">
-          <button
-            className={`premium-badge ${isPremium ? 'active' : ''}`}
-            onClick={() => isPremium ? null : setShowPremiumModal(true)}
-          >
-            {isPremium ? '✨ Premium Ativo' : '🔓 Ver Premium'}
-          </button>
+          {!isPremium && (
+            <button className="premium-badge" onClick={() => setShowPremiumModal(true)}>
+              🔓 Upgrade
+            </button>
+          )}
           <button className="logout-btn" onClick={signOut}>Sair</button>
         </div>
       </header>
 
-      <div className="dash-content">
-        {/* Categories */}
+      <main className="dash-content">
+        {/* Categories Horizontal Scroll */}
         <section className="section-block">
-          <h2 className="section-title">Tipo de Documento</h2>
+          <h2 className="section-title">O que vamos analisar?</h2>
           <div className="categories-scroll">
             {categories.map(cat => (
               <div
                 key={cat.id}
-                className={`category-card glass-card ${activeCategory === cat.id ? 'active-cat' : ''}`}
+                className={`category-card ${activeCategory === cat.id ? 'active-cat' : ''}`}
                 onClick={() => handleCategoryClick(cat)}
               >
                 <span className="cat-icon">{cat.icon}</span>
@@ -187,20 +185,17 @@ const Dashboard = () => {
           </div>
         </section>
 
-        {/* Upload Area */}
+        {/* Smart Input Card */}
         <section className="section-block">
-          <h2 className="section-title">Carregue ou cole seu documento</h2>
-
           <div
-            className={`upload-area glass-card ${dragOver ? 'drag-over' : ''}`}
+            className={`card upload-area ${dragOver ? 'drag-over' : ''}`}
             onDragOver={e => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={e => { e.preventDefault(); setDragOver(false); handleFileLoad(e.dataTransfer.files[0]); }}
           >
-            {/* File reading progress */}
             {isReading && (
               <div className="reading-progress">
-                <div className="progress-bar"><div className="progress-fill" style={{ width: `${readProgress}%` }} /></div>
+                <div className="progress-bar"><div className="progress-fill" style={{ width: `${readProgress}%`, background: 'var(--primary)' }} /></div>
                 <p>{readStatusMsg}</p>
               </div>
             )}
@@ -210,72 +205,45 @@ const Dashboard = () => {
             )}
 
             <textarea
-              placeholder="Cole aqui o texto do seu documento, ou arraste um arquivo abaixo..."
+              placeholder="Cole o texto aqui ou carregue um arquivo..."
               value={inputText}
               onChange={e => setInputText(e.target.value)}
               className="doc-textarea"
-              rows={8}
+              rows={6}
             />
 
             <div className="upload-actions">
-              <button className="btn-secondary file-btn" onClick={() => fileInputRef.current.click()}>
-                📎 Carregar Arquivo
+              <button className="btn-secondary" onClick={() => fileInputRef.current.click()}>
+                📎 Arquivo
               </button>
-              <div className="supported-formats">
-                PDF · JPG · PNG · DOCX · TXT
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept={ACCEPT_STRING}
-                hidden
-                onChange={e => handleFileLoad(e.target.files[0])}
-              />
-
-              {isAtLimit ? (
-                <button className="btn-primary analyze-btn limit-btn" onClick={() => setShowPremiumModal(true)}>
-                  🔒 Limite atingido — Premium
-                </button>
-              ) : (
-                <button
-                  className="btn-primary analyze-btn"
-                  onClick={handleAnalyze}
-                  disabled={isAnalyzing || isReading || inputText.length < 20}
-                >
-                  {isAnalyzing ? 'Analisando...' : '🔍 Analisar Documento'}
-                </button>
-              )}
+              <input ref={fileInputRef} type="file" accept={ACCEPT_STRING} hidden onChange={e => handleFileLoad(e.target.files[0])} />
+              
+              <button
+                className="btn-primary analyze-btn"
+                onClick={handleAnalyze}
+                disabled={isAnalyzing || isReading || inputText.length < 20}
+              >
+                {isAnalyzing ? 'Processando...' : '🔍 Analisar'}
+              </button>
             </div>
           </div>
 
-          {/* Usage bar */}
-          <div className="usage-bar-wrapper">
+          {/* Usage Visual */}
+          <div className="card usage-bar-wrapper">
             <div className="usage-labels">
-              <span>{isPremium ? '✨ Uso Ilimitado' : `${usageCount}/${FREE_ANALYSIS_LIMIT} análises gratuitas este mês`}</span>
-              {!isPremium && (
-                <span className="upgrade-link" onClick={() => setShowPremiumModal(true)}>
-                  Fazer upgrade →
-                </span>
-              )}
+              <span>{isPremium ? '✨ Uso Ilimitado' : `Uso: ${usageCount}/${FREE_ANALYSIS_LIMIT}`}</span>
+              {!isPremium && <span className="upgrade-link" onClick={() => setShowPremiumModal(true)}>Upgrade →</span>}
             </div>
             <div className="progress-bar">
               <div className="progress-fill" style={{
                 width: `${usagePercent}%`,
-                background: isPremium ? '#a67c52' : usagePercent >= 100 ? '#ef4444' : '#3b82f6'
+                background: usagePercent >= 90 ? 'var(--error)' : 'var(--primary)'
               }} />
             </div>
           </div>
         </section>
 
-        {/* Loading */}
-        {isAnalyzing && (
-          <div className="analysis-loading glass-card">
-            <div className="spinner" />
-            <p>Analisando seu documento com inteligência artificial...</p>
-          </div>
-        )}
-
-        {/* Results */}
+        {/* Results Sections */}
         {analysisResult && !isAnalyzing && (
           <div className="result-container">
             <div className="result-header-bar">
@@ -283,83 +251,82 @@ const Dashboard = () => {
                 <span>{analysisResult.docType.icon}</span>
                 <span>{analysisResult.docType.type}</span>
               </div>
-              <h2>Resultado da Análise</h2>
+              <h2 className="section-title" style={{marginBottom: 0}}>Análise Concluída</h2>
             </div>
 
             <div className="result-grid">
-              <div className="result-card glass-card">
-                <h4>📋 Resumo Simples</h4>
+              <div className="card result-card">
+                <h4>📋 Resumo</h4>
                 <p>{analysisResult.summary}</p>
               </div>
 
-              <div className="result-card glass-card">
-                <h4>📌 Pontos Importantes</h4>
+              <div className="card result-card risk-card">
+                <h4>⚠️ Alertas</h4>
+                <ul className="points-list">
+                  {analysisResult.risks.map((r, i) => <li key={i}>{r}</li>)}
+                </ul>
+              </div>
+
+              <div className="card result-card">
+                <h4>📌 Pontos Chave</h4>
                 <ul className="points-list">
                   {analysisResult.points.map((p, i) => <li key={i}>{p}</li>)}
                 </ul>
               </div>
 
-              <div className="result-card glass-card">
-                <h4>💵 Valores e Prazos</h4>
+              <div className="card result-card">
+                <h4>💵 Valores/Prazos</h4>
                 <ul className="points-list">
                   {analysisResult.values.map((v, i) => <li key={i}>{v}</li>)}
                 </ul>
               </div>
-
-              <div className="result-card glass-card risk-card">
-                <h4>⚠️ Alertas e Riscos</h4>
-                <ul className="points-list">
-                  {analysisResult.risks.map((r, i) => <li key={i}>{r}</li>)}
-                </ul>
-              </div>
             </div>
 
-            <div className="result-card detail-card glass-card">
-              <h4>📖 Explicação Passo a Passo</h4>
-              <pre className="detail-text">{analysisResult.detailed}</pre>
+            <div className="card detail-card">
+              <h4>📖 Explicação Detalhada</h4>
+              <div className="detail-text">{analysisResult.detailed}</div>
             </div>
 
-            {analysisResult.terms.length > 0 && (
-              <div className="result-card glass-card">
-                <h4>📚 Glossário de Termos Técnicos</h4>
-                <div className="terms-grid">
-                  {analysisResult.terms.map((t, i) => (
-                    <div key={i} className="term-item">
-                      <span className="term-name">"{t.term}"</span>
-                      <span className="term-explanation">= {t.explanation}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Q&A */}
-            <div className="result-card qa-card glass-card">
-              <h4>❓ Pergunte sobre o Documento</h4>
+            {/* Q&A Smart Card */}
+            <div className="card qa-card">
+              <h4>💬 Chat sobre o Documento</h4>
               {isPremium ? (
-                <>
-                  <div className="qa-input-row">
-                    <input
-                      type="text"
-                      placeholder="Ex: Qual a multa de cancelamento?"
-                      value={question}
-                      onChange={e => setQuestion(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleAskQuestion()}
-                    />
-                    <button className="btn-primary" onClick={handleAskQuestion}>Perguntar</button>
-                  </div>
-                  {answer && <div className="qa-answer"><p><strong>Resposta:</strong> {answer}</p></div>}
-                </>
+                <div className="qa-input-row" style={{display:'flex', gap:'8px', marginTop:'12px'}}>
+                  <input
+                    type="text"
+                    placeholder="Tire suas dúvidas..."
+                    value={question}
+                    onChange={e => setQuestion(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAskQuestion()}
+                  />
+                  <button className="btn-primary" onClick={handleAskQuestion}>Enviar</button>
+                </div>
               ) : (
-                <div className="premium-upsell" onClick={() => setShowPremiumModal(true)}>
-                  <p>💡 Perguntas sobre o documento são exclusivas do plano Premium.</p>
-                  <button className="btn-primary">✨ Ativar Premium — R$ 19,90/mês</button>
+                <div className="premium-upsell" onClick={() => setShowPremiumModal(true)} style={{textAlign:'center', padding:'12px'}}>
+                  <p>A dúvida é sua, a resposta é Premium. ✨</p>
                 </div>
               )}
+              {answer && <div className="qa-answer" style={{marginTop:'12px', padding:'12px', background:'#F0F7FF', borderRadius:'8px', borderLeft:'4px solid var(--primary)'}}><p>{answer}</p></div>}
             </div>
           </div>
         )}
-      </div>
+      </main>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="bottom-nav">
+        <div className={`nav-link ${activeTab === 'home' ? 'active' : ''}`} onClick={() => setActiveTab('home')}>
+          <span className="nav-icon">🏠</span>
+          <span>Início</span>
+        </div>
+        <div className={`nav-link ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
+          <span className="nav-icon">📜</span>
+          <span>Histórico</span>
+        </div>
+        <div className={`nav-link ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>
+          <span className="nav-icon">👤</span>
+          <span>Perfil</span>
+        </div>
+      </nav>
     </div>
   );
 };
