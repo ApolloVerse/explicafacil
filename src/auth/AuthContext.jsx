@@ -169,6 +169,22 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }
 
+  // Bypass for testing/dev: Mark user as verified immediately
+  async function skipVerification() {
+    if (!session?.user?.id) return false;
+    setLoading(true);
+    try {
+      const { profile: saved } = await linkPhoneToProfile(session.user.id, 'verified_email');
+      setProfile(saved);
+      return true;
+    } catch (err) {
+      console.error('Bypass error:', err);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const value = {
     session,
     profile,
@@ -180,6 +196,7 @@ export function AuthProvider({ children }) {
     sendEmailVerificationOTP,
     verifyEmailOTP,
     signOut,
+    skipVerification,
     isAuthenticated: !!session && !!profile?.phone,
     needsVerification: !!session && !profile?.phone,
   };

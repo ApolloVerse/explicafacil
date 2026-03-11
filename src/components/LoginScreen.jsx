@@ -5,7 +5,7 @@ import './LoginScreen.css';
 const STEPS = { WELCOME: 'welcome', SEND_EMAIL: 'send_email', OTP: 'otp' };
 
 const LoginScreen = () => {
-  const { signInWithGoogle, sendEmailVerificationOTP, verifyEmailOTP, authError, setAuthError, session, needsVerification } = useAuth();
+  const { signInWithGoogle, sendEmailVerificationOTP, verifyEmailOTP, skipVerification, authError, setAuthError, session, needsVerification } = useAuth();
   const [step, setStep] = useState(needsVerification ? STEPS.SEND_EMAIL : STEPS.WELCOME);
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -36,7 +36,12 @@ const LoginScreen = () => {
     setAuthError(null);
     const ok = await verifyEmailOTP(otp.trim());
     if (!ok) setLoading(false);
-    // On success AuthContext will update session & profile → App re-renders
+  };
+
+  const handleBypass = async () => {
+    setLoading(true);
+    await skipVerification();
+    setLoading(false);
   };
 
   return (
@@ -81,6 +86,7 @@ const LoginScreen = () => {
                 {loading ? 'Enviando...' : '📧 Enviar Código por Email'}
               </button>
               <div className="login-footer">
+                <span onClick={handleBypass} className="bypass-link">Pular Verificação (Modo Teste)</span>
                 <span onClick={() => { setStep(STEPS.WELCOME); setAuthError(null); }}>← Voltar</span>
               </div>
             </div>
@@ -108,6 +114,7 @@ const LoginScreen = () => {
                 {loading ? 'Verificando...' : '✅ Verificar e Entrar'}
               </button>
               <div className="login-footer">
+                <span onClick={handleBypass} className="bypass-link">Pular (Entrar agora)</span>
                 <span onClick={handleSendOTP}>Reenviar código</span>
               </div>
             </div>
