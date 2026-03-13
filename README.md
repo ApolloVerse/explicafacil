@@ -1,31 +1,20 @@
-# 📄✨ Explica Fácil
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
 
-Inteligência Artificial para descomplicar qualquer documento. Transforme contratos complexos, bulas de remédios e PDFs densos em explicações simples e diretas.
+# Run and deploy your AI Studio app
 
-## 🚀 Funcionalidades
-- **Autenticação Segura**: Login com Google + Verificação por E-mail (OTP).
-- **Multi-Formato**: Suporte para PDF, Imagens (OCR), Word (.docx) e Texto.
-- **Análise Inteligente**: Receba resumos, pontos importantes, riscos e glossário técnico.
-- **Modo Pular Verificação**: Atalho para testes rápidos sem depender de limites de e-mail.
-- **Design Premium**: Interface moderna com glassmorphism e micro-animações.
+This contains everything you need to run your app locally.
 
-## 🛠️ Tecnologias
-- **Frontend**: React.js + Vite
-- **Backend/Auth**: Supabase
-- **Estilização**: Modern CSS
-- **Deploy**: Vercel
+View your app in AI Studio: https://ai.studio/apps/5c99781b-64d4-4c65-91f9-22d9d1fd36ad
 
-## ⚙️ Configuração
-Para rodar localmente ou em produção, adicione as seguintes variáveis no seu arquivo `.env` ou no painel da Vercel:
-```env
-VITE_SUPABASE_URL=seu_url_do_supabase
-VITE_SUPABASE_ANON_KEY=sua_chave_anonima
-```
+## Run Locally
 
-## 📦 Como rodar
-1. Instale as dependências: `npm install`
-2. Rode em desenvolvimento: `npm run dev`
-3. Faça o build de produção: `npm run build`
+**Prerequisites:**  Node.js
 
----
-Desenvolvido por **ApolloVerse** 🚀
+
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
