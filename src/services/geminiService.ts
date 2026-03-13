@@ -1,6 +1,7 @@
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+const genAI = new GoogleGenerativeAI(apiKey);
 
 export const SYSTEM_PROMPT = `Você é um assistente especializado em analisar e explicar documentos complexos em linguagem simples e acessível. Seu objetivo é ajudar qualquer pessoa a entender rapidamente documentos que normalmente exigiriam conhecimento jurídico, técnico ou médico.
 
@@ -43,42 +44,42 @@ FORMATO DE RESPOSTA (Use Markdown):
 Se o usuário fizer perguntas, responda apenas com base no documento em linguagem simples.`;
 
 export async function analyzeDocument(fileData: string, mimeType: string) {
-  const model = ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: [
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    const result = await model.generateContent([
+      { text: SYSTEM_PROMPT },
       {
-        parts: [
-          { text: SYSTEM_PROMPT },
-          {
-            inlineData: {
-              data: fileData.split(",")[1],
-              mimeType: mimeType,
-            },
-          },
-          { text: "Analise este documento seguindo as regras e o formato de resposta definidos." },
-        ],
+        inlineData: {
+          data: fileData.split(",")[1],
+          mimeType: mimeType,
+        },
       },
-    ],
-  });
+      { text: "Analise este documento seguindo as regras e o formato de resposta definidos." },
+    ]);
 
-  const response = await model;
-  return response.text;
+    const response = await result.response;
+    return response.text();
+  } catch (error) {
+    console.error("Error analyzing document:", error);
+    throw error;
+  }
 }
 
 export async function askQuestion(documentContext: string, question: string) {
-  const model = ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: [
-      {
-        parts: [
-          { text: SYSTEM_PROMPT },
-          { text: `Contexto do Documento: ${documentContext}` },
-          { text: `Pergunta do Usuário: ${question}` },
-        ],
-      },
-    ],
-  });
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    const result = await model.generateContent([
+      { text: SYSTEM_PROMPT },
+      { text: `Contexto do Documento: ${documentContext}` },
+      { text: `Pergunta do Usuário: ${question}` },
+    ]);
 
-  const response = await model;
-  return response.text;
+    const response = await result.response;
+    return response.text();
+  } catch (error) {
+    console.error("Error asking question:", error);
+    throw error;
+  }
 }
