@@ -157,7 +157,7 @@ FÁCIL DE ENTENDER`;
 
 export async function* analyzeDocumentStream(fileData: string, mimeType: string) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
     
     const result = await model.generateContentStream([
       { text: SYSTEM_PROMPT },
@@ -182,7 +182,7 @@ export async function* analyzeDocumentStream(fileData: string, mimeType: string)
 
 export async function analyzeDocument(fileData: string, mimeType: string) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
     
     const result = await model.generateContent([
       { text: SYSTEM_PROMPT },
@@ -205,7 +205,7 @@ export async function analyzeDocument(fileData: string, mimeType: string) {
 
 export async function askQuestion(documentContext: string, question: string) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
     
     const result = await model.generateContent([
       { text: SYSTEM_PROMPT },
