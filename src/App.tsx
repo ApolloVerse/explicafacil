@@ -8,7 +8,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { analyzeDocument, askQuestion, analyzeDocumentStream } from './services/geminiService';
-import { supabase } from './lib/supabase';
+import { supabase, supabaseConfigured } from './lib/supabase';
 
 // --- Configuration ---
 const PREFER_MOCK = false; 
@@ -58,6 +58,12 @@ export default function App() {
   const syncedRef = useRef(false);
 
   useEffect(() => {
+    // Se o Supabase não está configurado, mostra a tela de login imediatamente
+    if (!supabaseConfigured) {
+      setAuthLoading(false);
+      return;
+    }
+
     let mounted = true;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
@@ -80,10 +86,8 @@ export default function App() {
       setAuthLoading(false);
     });
 
-    // Inicialização forçada para evitar tela branca em caso de trava do Supabase
     const initAuth = async () => {
       try {
-        // Tenta pegar a sessão inicial sem travar
         const { data: { session: s } } = await supabase.auth.getSession();
         if (mounted && s) {
           setSession(s);
@@ -91,19 +95,16 @@ export default function App() {
           syncedRef.current = true;
         }
       } catch (err) {
-        console.warn("[AUTH] Initial session check ignored (locked or error).");
+        console.warn("[AUTH] Initial session check failed.");
       } finally {
-        // Independente de erro ou sucesso, liberamos a tela após 1.5s
         setTimeout(() => { if (mounted) setAuthLoading(false); }, 1500);
       }
     };
 
     initAuth();
 
-    // Trava de segurança absoluta: libera a tela após 6s não importa o que aconteça
     const safetyTimer = setTimeout(() => {
       if (mounted && authLoading) {
-        console.warn("[AUTH] Safety timeout - forced loading completion.");
         setAuthLoading(false);
       }
     }, 6000);
