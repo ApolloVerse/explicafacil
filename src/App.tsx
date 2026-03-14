@@ -268,6 +268,30 @@ export default function App() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (window.confirm('⚠️ ATENÇÃO: Deseja excluir permanentemente sua conta e todos os seus dados? Esta ação não pode ser desfeita.')) {
+      const currentUserId = session?.user?.id;
+      if (!currentUserId) return;
+
+      try {
+        setLoading(true);
+        // Deleta dados das tabelas públicas
+        await supabase.from('analyses').delete().eq('user_id', currentUserId);
+        await supabase.from('payments').delete().eq('user_id', currentUserId);
+        await supabase.from('profiles').delete().eq('id', currentUserId);
+        
+        // Log out (O usuário será removido do banco, mas a conta Auth precisa ser removida no painel ou via RPC se configurado)
+        await supabase.auth.signOut();
+        alert('Seus dados foram excluídos com sucesso.');
+      } catch (err) {
+        console.error("Erro ao excluir conta:", err);
+        alert('Erro ao excluir dados. Por favor, tente novamente.');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const handleUpdatePhoto = async (file: File) => {
     const currentUserId = session?.user?.id;
     if (!currentUserId) {
@@ -340,6 +364,7 @@ export default function App() {
                   onLogout={handleLogout} 
                   onUpgrade={() => setActiveTab('planos')}
                   onUpdatePhoto={handleUpdatePhoto}
+                  onDeleteAccount={handleDeleteAccount}
                   setProfile={setProfile}
                 />;
               case 'planos': return <ScreenPlanos profile={profile} onSelect={() => setActiveTab('pagamento')} onBack={() => setActiveTab('inicio')} />;
@@ -553,7 +578,7 @@ function ScreenHistorico({ history, profile, onView, onNew, onGoPlans, onDelete 
   );
 }
 
-function ScreenPerfil({ user, profile, onLogout, onUpgrade, onUpdatePhoto, setProfile }: any) {
+function ScreenPerfil({ user, profile, onLogout, onUpgrade, onUpdatePhoto, onDeleteAccount, setProfile }: any) {
   const isPremium = profile?.plan_tier === 'premium';
   const remaining = Math.max(0, (profile?.analysis_limit || 0) - (profile?.analysis_count || 0));
   const [isEditing, setIsEditing] = useState(!profile?.name || !profile?.phone);
@@ -742,18 +767,27 @@ function ScreenPerfil({ user, profile, onLogout, onUpgrade, onUpdatePhoto, setPr
          )}
       </div>
 
-      {!isPremium && (
-        <div className="bg-[#1E293B] p-8 rounded-[40px] text-white shadow-2xl">
-           <div className="flex justify-between items-center mb-6">
-              <span className="text-sm font-black uppercase tracking-widest text-slate-400">Tempo de Uso</span>
-              <span className="text-green-500 font-black text-lg">{remaining} restantes</span>
-           </div>
-           <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden mb-8">
-              <motion.div initial={{ width: 0 }} animate={{ width: `${(remaining / 3) * 100}%` }} className="h-full bg-green-500" />
-           </div>
-           <button onClick={onUpgrade} className="w-full bg-white text-[#1E293B] py-5 rounded-[24px] font-black text-sm shadow-xl flex items-center justify-center gap-2">FAZER UPGRADE AGORA <Zap className="w-4 h-4 fill-[#1E293B]"/></button>
-        </div>
-      )}
+      <div className="flex flex-col gap-4">
+        {!isPremium && (
+          <div className="bg-[#1E293B] p-8 rounded-[40px] text-white shadow-2xl">
+             <div className="flex justify-between items-center mb-6">
+                <span className="text-sm font-black uppercase tracking-widest text-slate-400">Tempo de Uso</span>
+                <span className="text-green-500 font-black text-lg">{remaining} restantes</span>
+             </div>
+             <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden mb-8">
+                <motion.div initial={{ width: 0 }} animate={{ width: `${(remaining / 3) * 100}%` }} className="h-full bg-green-500" />
+             </div>
+             <button onClick={onUpgrade} className="w-full bg-white text-[#1E293B] py-5 rounded-[24px] font-black text-sm shadow-xl flex items-center justify-center gap-2">FAZER UPGRADE AGORA <Zap className="w-4 h-4 fill-[#1E293B]"/></button>
+          </div>
+        )}
+
+        <button 
+          onClick={onDeleteAccount}
+          className="w-full py-5 text-red-400 font-black text-[10px] tracking-[3px] uppercase hover:bg-red-50 rounded-3xl transition-all"
+        >
+          EXCLUIR MINHA CONTA E DADOS
+        </button>
+      </div>
 
       {!isPremium && (
         <div className="grid grid-cols-2 gap-6 pb-4">
