@@ -181,12 +181,20 @@ export default function App() {
   const handleLoginGoogle = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin }
+      options: { 
+        redirectTo: window.location.origin,
+        queryParams: {
+          prompt: 'select_account'
+        }
+      }
     });
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    setSession(null);
+    setProfile(null);
+    setAnalysisHistory([]);
     setActiveTab('inicio');
   };
 
