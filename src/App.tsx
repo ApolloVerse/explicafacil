@@ -980,6 +980,17 @@ function ScreenPagamento({ onBack, onConfirm }: any) {
     setTimeout(onConfirm, 2000); // Simulando o tempo da API
   };
 
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (paymentMethod === 'pix' && !payLoading) {
+      // Automatic confirmation simulation after 8 seconds
+      timer = setTimeout(() => {
+        handlePay();
+      }, 8000);
+    }
+    return () => clearTimeout(timer);
+  }, [paymentMethod, payLoading]);
+
   return (
     <div className="flex flex-col gap-10 h-full bg-white p-6 md:p-12 rounded-[40px] shadow-sm min-h-[80vh]">
       <div className="flex items-center gap-4">
@@ -1021,8 +1032,14 @@ function ScreenPagamento({ onBack, onConfirm }: any) {
 
          {paymentMethod === 'pix' ? (
             <div className="flex flex-col items-center gap-6 bg-slate-50 p-8 rounded-3xl border border-slate-100 border-dashed">
-               <div className="p-5 bg-white rounded-[32px] shadow-sm border border-slate-100 flex items-center justify-center hover:shadow-md transition-shadow">
-                  <QRCodeCanvas value="00020126470014br.gov.bcb.pix0125linobotelho2121@gmail.com520400005303986540519.905802BR5909CURTAMAIS6009Sao Paulo610901227-20062230519daqr1635057486071816304C3BF" size={180} level="M" />
+               <div className="p-5 bg-white rounded-[32px] shadow-sm border border-slate-100 flex items-center justify-center hover:shadow-md transition-shadow relative">
+                  {payLoading && (
+                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm rounded-[32px] flex flex-col items-center justify-center z-10">
+                      <Loader2 className="w-10 h-10 text-green-500 animate-spin mb-2" />
+                      <span className="text-[10px] font-black tracking-widest uppercase text-green-600">Aprovando...</span>
+                    </div>
+                  )}
+                  <QRCodeCanvas value="00020126470014br.gov.bcb.pix0125linobotelho2121@gmail.com520400005303986540519.905802BR5910Core Build6009Sao Paulo610901227-20062230519daqr16350574860718163049522" size={180} level="M" />
                </div>
                <div className="flex flex-col items-center gap-2 w-full max-w-sm">
                  <p className="text-[13px] font-bold text-slate-400 text-center px-4 leading-relaxed mb-2">
@@ -1030,7 +1047,7 @@ function ScreenPagamento({ onBack, onConfirm }: any) {
                  </p>
                  <div className="flex justify-center mt-1 w-full relative group">
                    <div className="absolute inset-0 bg-green-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                   <button onClick={() => { navigator.clipboard.writeText("00020126470014br.gov.bcb.pix0125linobotelho2121@gmail.com520400005303986540519.905802BR5909CURTAMAIS6009Sao Paulo610901227-20062230519daqr1635057486071816304C3BF"); alert("Pix Copia e Cola copiado com sucesso!"); }} className="bg-[#1E293B] w-full text-white text-[13px] tracking-wide font-black uppercase px-6 py-4 rounded-2xl hover:bg-black transition-all flex items-center justify-center gap-3 active:scale-95 shadow-lg border border-slate-700 relative z-10 text-center">
+                   <button onClick={() => { navigator.clipboard.writeText("00020126470014br.gov.bcb.pix0125linobotelho2121@gmail.com520400005303986540519.905802BR5910Core Build6009Sao Paulo610901227-20062230519daqr16350574860718163049522"); alert("Pix Copia e Cola copiado com sucesso!"); }} disabled={payLoading} className="bg-[#1E293B] w-full text-white text-[13px] tracking-wide font-black uppercase px-6 py-4 rounded-2xl hover:bg-black transition-all flex items-center justify-center gap-3 active:scale-95 shadow-lg border border-slate-700 relative z-10 text-center disabled:opacity-50">
                      PIX COPIA E COLA 
                      <span className="w-5 h-5 bg-white/10 rounded-md flex items-center justify-center">
                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='13' height='13' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'%3E%3C/path%3E%3C/svg%3E" alt="copy" className="w-3 h-3 invert opacity-80" />
@@ -1038,13 +1055,14 @@ function ScreenPagamento({ onBack, onConfirm }: any) {
                    </button>
                  </div>
                  <div className="flex items-center gap-2 mt-4 text-[10px] font-black text-green-700 bg-green-50/80 border border-green-100 px-4 py-2.5 rounded-full uppercase tracking-widest text-center shadow-sm">
-                   <ShieldCheck className="w-4 h-4" /> Beneficiário: CURTAMAIS
+                   <ShieldCheck className="w-4 h-4" /> Beneficiário: Core Build
                  </div>
                </div>
-
-               <button onClick={handlePay} className="w-full max-w-sm bg-[#22C55E] text-white py-5 rounded-[24px] font-black shadow-xl shadow-green-500/20 flex items-center justify-center gap-4 hover:bg-green-500 hover:-translate-y-0.5 transition-all mt-4 border border-green-400">
-                  {payLoading ? <Loader2 className="animate-spin" /> : <>JÁ REALIZEI O PAGAMENTO <Check className="w-5 h-5"/></>}
-               </button>
+               
+               <div className="w-full max-w-sm flex items-center justify-center gap-3 p-4">
+                 <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
+                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Aguardando Pagamento...</span>
+               </div>
             </div>
          ) : (
             <div className="flex flex-col gap-4">
