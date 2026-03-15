@@ -964,17 +964,9 @@ function ScreenPlanos({ profile, onSelect, onBack }: any) {
 
 function ScreenPagamento({ onBack, onConfirm }: any) {
   const [payLoading, setPayLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('pix');
-  const [cardData, setCardData] = useState({ number: '', name: '', expiry: '', cvv: '' });
   const [error, setError] = useState('');
 
   const handlePay = () => {
-    if (paymentMethod === 'card') {
-      if (!cardData.number || !cardData.name || !cardData.expiry || !cardData.cvv) {
-        setError('Preencha todos os dados do cartão.');
-        return;
-      }
-    }
     setError('');
     setPayLoading(true);
     setTimeout(onConfirm, 2000); // Simulando o tempo da API
@@ -982,14 +974,14 @@ function ScreenPagamento({ onBack, onConfirm }: any) {
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (paymentMethod === 'pix' && !payLoading) {
+    if (!payLoading) {
       // Automatic confirmation simulation after 8 seconds
       timer = setTimeout(() => {
         handlePay();
       }, 8000);
     }
     return () => clearTimeout(timer);
-  }, [paymentMethod, payLoading]);
+  }, [payLoading]);
 
   return (
     <div className="flex flex-col gap-10 h-full bg-white p-6 md:p-12 rounded-[40px] shadow-sm min-h-[80vh]">
@@ -1018,19 +1010,23 @@ function ScreenPagamento({ onBack, onConfirm }: any) {
                   <span className="text-xs md:text-sm font-bold text-slate-400">Ativação imediata após confirmação</span>
                </div>
             </div>
-         </div>
-
-         <div className="flex flex-col gap-4">
-            <span className="text-xs font-black text-slate-300 uppercase px-1 tracking-widest">Método de Checkout</span>
-            <div className="grid grid-cols-2 gap-4">
-               <CheckoutOption icon={QrCode} label="PIX" active={paymentMethod === 'pix'} onClick={() => setPaymentMethod('pix')} />
-               <CheckoutOption icon={CreditCard} label="Cartão" active={paymentMethod === 'card'} onClick={() => setPaymentMethod('card')} />
-            </div>
+            <div className="flex flex-col gap-4">
+             <span className="text-xs font-black text-slate-300 uppercase px-1 tracking-widest">Método de Checkout</span>
+             <div className="grid grid-cols-1">
+                <div className="bg-slate-50 border-2 border-green-500/20 p-5 rounded-3xl flex items-center justify-between shadow-sm">
+                   <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm"><QrCode className="text-green-500 w-5 h-5" /></div>
+                      <span className="text-sm font-black text-[#1E293B]">PIX (Padrão)</span>
+                   </div>
+                   <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-sm shadow-green-500/20"><Check className="text-white w-4 h-4" /></div>
+                </div>
+             </div>
+          </div>
          </div>
 
          {error && <div className="text-red-500 text-sm font-bold text-center px-4 py-3 bg-red-50 rounded-2xl">{error}</div>}
 
-         {paymentMethod === 'pix' ? (
+         
             <div className="flex flex-col items-center gap-6 bg-slate-50 p-8 rounded-3xl border border-slate-100 border-dashed">
                <div className="p-5 bg-white rounded-[32px] shadow-sm border border-slate-100 flex items-center justify-center hover:shadow-md transition-shadow relative">
                   {payLoading && (
@@ -1064,19 +1060,7 @@ function ScreenPagamento({ onBack, onConfirm }: any) {
                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Aguardando Pagamento...</span>
                </div>
             </div>
-         ) : (
-            <div className="flex flex-col gap-4">
-               <input type="text" placeholder="Número do Cartão" value={cardData.number} onChange={e => setCardData({...cardData, number: e.target.value})} className="w-full bg-slate-50 border-2 border-transparent px-6 py-5 rounded-[20px] font-bold text-[#1E293B] focus:bg-white focus:border-green-500/20 active:outline-none focus:outline-none transition-all placeholder:text-slate-300 shadow-inner" />
-               <input type="text" placeholder="Nome Impresso no Cartão" value={cardData.name} onChange={e => setCardData({...cardData, name: e.target.value})} className="w-full bg-slate-50 border-2 border-transparent px-6 py-5 rounded-[20px] font-bold text-[#1E293B] focus:bg-white focus:border-green-500/20 active:outline-none focus:outline-none transition-all placeholder:text-slate-300 shadow-inner" />
-               <div className="grid grid-cols-2 gap-4">
-                  <input type="text" placeholder="Validade (MM/YY)" value={cardData.expiry} onChange={e => setCardData({...cardData, expiry: e.target.value})} className="w-full bg-slate-50 border-2 border-transparent px-6 py-5 rounded-[20px] font-bold text-[#1E293B] focus:bg-white focus:border-green-500/20 active:outline-none focus:outline-none transition-all placeholder:text-slate-300 shadow-inner" />
-                  <input type="text" placeholder="CVV" value={cardData.cvv} onChange={e => setCardData({...cardData, cvv: e.target.value})} className="w-full bg-slate-50 border-2 border-transparent px-6 py-5 rounded-[20px] font-bold text-[#1E293B] focus:bg-white focus:border-green-500/20 active:outline-none focus:outline-none transition-all placeholder:text-slate-300 shadow-inner" />
-               </div>
-               <button onClick={handlePay} className="w-full bg-[#1E293B] text-white py-6 md:py-7 rounded-[32px] font-black shadow-2xl flex items-center justify-center gap-4 hover:bg-black transition-all mt-4 hover:shadow-green-900/20">
-                  {payLoading ? <Loader2 className="animate-spin" /> : <>PAGAR AGORA (Simulação) <ChevronRight/></>}
-               </button>
-            </div>
-         )}
+         
       </div>
 
       <div className="flex items-center justify-center gap-3 text-slate-300 mt-auto pt-8">
