@@ -730,12 +730,11 @@ function ScreenPerfil({ user, profile, onLogout, onUpgrade, onUpdatePhoto, setPr
   const [isEditing, setIsEditing] = useState(!profile?.name || !profile?.phone);
   const [editName, setEditName] = useState(profile?.name || '');
   const [editPhone, setEditPhone] = useState(profile?.phone || '');
+  const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [editPhone, setEditPhone] = useState(profile?.phone || '');
-  const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (profile?.premium_expires_at) {
