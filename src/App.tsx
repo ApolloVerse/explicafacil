@@ -136,6 +136,7 @@ export default function App() {
       .channel(`session_sync_${profile.id}`)
       .on('postgres_changes', { 
         event: 'UPDATE', 
+        schema: 'public',
         table: 'profiles', 
         filter: `id=eq.${profile.id}` 
       }, (payload) => {
