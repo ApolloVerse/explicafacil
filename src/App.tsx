@@ -4,7 +4,7 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { 
   FileText, CheckCircle2, Loader2, Send, X, History, Home as HomeIcon, Upload, Search, Filter, 
   MoreVertical, PlayCircle, Bell, User, Lock, Mail, Github, LogOut, Star, TrendingUp, ChevronRight,
-  ShieldCheck, CreditCard, Zap, Check, ArrowLeft, Camera, Shield, HelpCircle, Trash2, Pill, Stethoscope, Scale, Receipt, QrCode, Phone, Menu
+  ShieldCheck, CreditCard, Zap, Check, ArrowLeft, Camera, Shield, HelpCircle, Trash2, Pill, Stethoscope, Scale, Receipt, QrCode, Phone, Menu, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
@@ -1166,9 +1166,7 @@ function ScreenPagamento({ user, onBack, onConfirm }: any) {
             )}
          </div>
       </div>
-         
-      </div>
-
+          
       <div className="flex items-center justify-center gap-3 text-slate-300 mt-auto pt-8">
          <ShieldCheck className="w-5 h-5 text-green-500" />
          <span className="text-[10px] md:text-xs font-bold uppercase tracking-[2px]">Pagamento 100% Seguro e Criptografado</span>
