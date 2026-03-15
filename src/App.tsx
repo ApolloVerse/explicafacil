@@ -136,12 +136,13 @@ export default function App() {
       .channel(`session_sync_${profile.id}`)
       .on('postgres_changes', { 
         event: 'UPDATE', 
-        schema: 'public', 
         table: 'profiles', 
         filter: `id=eq.${profile.id}` 
       }, (payload) => {
         const newSessionId = payload.new.current_session_id;
         console.log("[SESSION] DB Change detected:", newSessionId, "vs Local:", sessionId);
+        
+        // Se o novo session_id for diferente do local, e este dispositivo JÁ tinha um session_id salvo
         if (newSessionId && newSessionId !== sessionId) {
           alert("Sua conta foi acessada em outro dispositivo. Você será deslogado para sua segurança.");
           handleLogout();
@@ -168,7 +169,7 @@ export default function App() {
       const metadata = authUser.user_metadata;
       
       // Se o perfil não existir ou faltar dados básicos, usamos metadados do Google
-      if (!data || !data.name || !data.avatar_url) {
+      if (!data || !data.name || (!data.avatar_url && (metadata?.avatar_url || metadata?.picture))) {
         const updates: any = {};
         if (!data?.name && (metadata?.full_name || metadata?.name)) {
           updates.name = metadata.full_name || metadata.name;
