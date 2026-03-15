@@ -105,26 +105,6 @@ export default function App() {
           await syncUserData(s.user);
           syncedRef.current = true;
         }
-        if (mounted) setSession(session);
-        if (session?.user) {
-          syncUserData(session.user);
-          
-          // Single Device Login: Monitor session changes
-          supabase
-            .channel('profile_changes')
-            .on('postgres_changes', { 
-              event: 'UPDATE', 
-              schema: 'public', 
-              table: 'profiles', 
-              filter: `id=eq.${session.user.id}` 
-            }, (payload) => {
-              if (payload.new.current_session_id && payload.new.current_session_id !== sessionId) {
-                alert("Sua conta foi acessada em outro dispositivo. Você será deslogado.");
-                handleLogout();
-              }
-            })
-            .subscribe();
-        }
       } catch (err) {
         console.warn("[AUTH] Initial session check failed.");
       } finally {
@@ -146,6 +126,36 @@ export default function App() {
       clearTimeout(safetyTimer);
     };
   }, []);
+
+  // Single Device Login: Monitor session changes in a dedicated effect
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    console.log("[SESSION] Starting monitoring for user:", profile.id);
+    const channel = supabase
+      .channel(`session_sync_${profile.id}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'profiles', 
+        filter: `id=eq.${profile.id}` 
+      }, (payload) => {
+        const newSessionId = payload.new.current_session_id;
+        console.log("[SESSION] DB Change detected:", newSessionId, "vs Local:", sessionId);
+        if (newSessionId && newSessionId !== sessionId) {
+          alert("Sua conta foi acessada em outro dispositivo. Você será deslogado para sua segurança.");
+          handleLogout();
+        }
+      })
+      .subscribe((status) => {
+        console.log("[SESSION] Subscription status:", status);
+      });
+
+    return () => {
+      console.log("[SESSION] Cleaning up monitoring");
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id]);
 
   const syncUserData = async (authUser: any) => {
     try {
