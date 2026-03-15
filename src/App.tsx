@@ -561,9 +561,15 @@ export default function App() {
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
         .dash-border { background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='40' ry='40' stroke='%2322C55E' stroke-width='4' stroke-dasharray='16%2c 16' stroke-dashoffset='0' stroke-linecap='round'/%3e%3c/svg%3e"); border-radius: 40px; }
-        .markdown-content h1 { font-size: 1.4rem; font-weight: 800; color: #1E293B; margin-bottom: 1rem; }
-        .markdown-content p { color: #64748B; margin-bottom: 1rem; line-height: 1.7; font-size: 1rem; }
-        .markdown-content strong { color: #334155; }
+        .markdown-content h1 { font-size: 1.6rem; font-weight: 900; color: #1E293B; margin: 1.5rem 0 1rem; border-bottom: 2px solid #F1F5F9; padding-bottom: 0.5rem; }
+        .markdown-content h2 { font-size: 1.2rem; font-weight: 800; color: #1E293B; margin: 1.5rem 0 0.75rem; display: flex; items-center; gap: 0.5rem; }
+        .markdown-content h3 { font-size: 1rem; font-weight: 800; color: #475569; margin: 1.25rem 0 0.5rem; }
+        .markdown-content p { color: #475569; margin-bottom: 1rem; line-height: 1.8; font-size: 1rem; font-weight: 500; }
+        .markdown-content strong { color: #1E293B; font-weight: 800; }
+        .markdown-content ul, .markdown-content ol { margin-bottom: 1.25rem; padding-left: 1.25rem; }
+        .markdown-content li { margin-bottom: 0.5rem; color: #475569; font-weight: 500; line-height: 1.6; }
+        .markdown-content hr { border: 0; border-top: 2px dashed #E2E8F0; margin: 2rem 0; }
+        .markdown-content blockquote { border-left: 4px solid #22C55E; padding-left: 1rem; font-style: italic; color: #64748B; margin-bottom: 1rem; }
       `}</style>
     </div>
   );
@@ -1196,7 +1202,13 @@ function ScreenExplicacoes({ analysis, messages, setMessages, input, setInput, c
             {messages.length === 0 && <div className="text-slate-400 font-bold text-center py-4 text-xs mt-auto mb-auto">Alguma dúvida sobre o texto ao lado? Pergunte aqui!</div>}
             {messages.map((m: any, i: number) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                 <div className={`max-w-[85%] p-4 lg:p-5 rounded-3xl text-[13px] leading-relaxed font-bold shadow-sm inline-block ${m.role === 'user' ? 'bg-[#22C55E] text-white rounded-br-sm' : 'bg-white/5 text-slate-300 rounded-bl-sm border border-white/5'}`}>{m.content}</div>
+                 <div className={`max-w-[88%] p-5 rounded-[24px] text-[13px] leading-relaxed font-bold shadow-sm transition-all ${
+                   m.role === 'user' 
+                     ? 'bg-[#22C55E] text-white rounded-tr-sm' 
+                     : 'bg-white/5 text-slate-200 rounded-tl-sm border border-white/5'
+                 }`}>
+                   <Markdown>{m.content}</Markdown>
+                 </div>
               </div>
             ))}
             {chatLoading && <div className="text-green-500 text-[10px] font-black animate-pulse flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin"/> LENDO DOCUMENTO...</div>}
