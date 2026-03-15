@@ -441,6 +441,9 @@ export default function App() {
                  <span className="text-sm font-black capitalize">{profile?.plan_tier}</span>
               </div>
            </div>
+           <div className="mt-4 text-center">
+             <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">v1.2</span>
+           </div>
         </div>
       </aside>
 
@@ -493,6 +496,9 @@ export default function App() {
                     </button>
                   ))}
                 </nav>
+                <div className="p-6 text-center border-t border-slate-50">
+                   <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">v1.2</span>
+                </div>
               </motion.div>
             </>
           )}
@@ -505,14 +511,7 @@ export default function App() {
            </div>
         </div>
 
-        {/* Legacy/Mobile Bottom Navigation (Hidden on forms/chat) */}
-        {activeTab !== 'explicações' && activeTab !== 'pagamento' && (
-          <nav className="md:hidden fixed bottom-6 left-6 right-6 h-20 bg-white/90 backdrop-blur-xl border border-slate-100 rounded-[32px] flex items-center justify-around px-2 z-30 shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
-            {navItems.map(item => (
-              <NavItem key={item.id} icon={item.icon} label={item.label} active={activeTab === item.id} onClick={() => handleNavClick(item.id as TabType)} />
-            ))}
-          </nav>
-        )}
+
       </div>
 
       <style>{`
@@ -535,9 +534,20 @@ function ScreenAuth({ onLoginGoogle }: any) {
   return (
     <div className="min-h-screen bg-[#F0F2F5] flex flex-col items-center justify-center p-6 w-full">
       <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-white p-12 rounded-[48px] shadow-2xl shadow-green-900/5 max-w-[480px] w-full flex flex-col items-center text-center">
-        <div className="w-24 h-24 bg-[#22C55E] rounded-[32px] flex items-center justify-center shadow-xl shadow-green-200 mb-8 rotate-3">
+        <motion.div 
+          animate={{ 
+            y: [0, -10, 0],
+            rotate: [3, 6, 3] 
+          }} 
+          transition={{ 
+            duration: 4, 
+            repeat: Infinity,
+            ease: "easeInOut" 
+          }}
+          className="w-24 h-24 bg-[#22C55E] rounded-[32px] flex items-center justify-center shadow-xl shadow-green-200 mb-8"
+        >
           <FileText className="text-white w-10 h-10" />
-        </div>
+        </motion.div>
         <h1 className="text-5xl font-black text-[#1E293B] mb-4 tracking-tighter uppercase">ExplicaFácil</h1>
         <p className="text-slate-400 font-bold mb-12 leading-relaxed text-sm px-4">Simplificando documentos complexos para você com inteligência artificial.</p>
         
@@ -550,6 +560,9 @@ function ScreenAuth({ onLoginGoogle }: any) {
         </div>
         
         <p className="mt-12 text-[10px] text-slate-300 font-bold leading-loose uppercase tracking-widest">Ao continuar, você concorda com nossos <br/> <span className="text-[#22C55E] cursor-pointer hover:underline">Termos de Uso</span> e <span className="text-[#22C55E] cursor-pointer hover:underline">Privacidade</span></p>
+        <div className="mt-4">
+           <span className="text-[10px] font-bold text-slate-200 uppercase tracking-widest">v1.2</span>
+        </div>
       </motion.div>
     </div>
   );
@@ -1098,14 +1111,7 @@ function ScreenExplicacoes({ analysis, messages, setMessages, input, setInput, c
 
 // --- Atomic components ---
 
-function NavItem({ icon: Icon, label, active, onClick }: any) {
-  return (
-    <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'text-[#22C55E]' : 'text-[#94A3B8]'}`}>
-       <motion.div whileTap={{ scale: 0.9 }} className={`p-2.5 rounded-2xl transition-all ${active ? 'bg-green-50 shadow-sm' : ''}`}><Icon className="w-7 h-7" /></motion.div>
-       <span className="text-[9px] font-black tracking-[1.5px] uppercase">{label}</span>
-    </div>
-  );
-}
+
 
 function AuthInput({ icon: Icon, placeholder, value }: any) {
   return (
