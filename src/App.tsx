@@ -58,6 +58,15 @@ export default function App() {
   const syncedRef = useRef(false);
 
   useEffect(() => {
+    // FORÇAR LOGOUT NO BOOT (Requisito: Sempre mostrar tela de login)
+    if (supabaseConfigured && !syncedRef.current) {
+      supabase.auth.signOut().then(() => {
+        setSession(null);
+        setProfile(null);
+        setAuthLoading(false);
+      });
+    }
+
     // Se o Supabase não está configurado, mostra a tela de login imediatamente
     if (!supabaseConfigured) {
       setAuthLoading(false);
@@ -276,30 +285,6 @@ export default function App() {
     }
   };
 
-  const handleDeleteAccount = async () => {
-    if (window.confirm('⚠️ ATENÇÃO: Deseja excluir permanentemente sua conta e todos os seus dados? Esta ação não pode ser desfeita.')) {
-      const currentUserId = session?.user?.id;
-      if (!currentUserId) return;
-
-      try {
-        setLoading(true);
-        // Deleta dados das tabelas públicas
-        await supabase.from('analyses').delete().eq('user_id', currentUserId);
-        await supabase.from('payments').delete().eq('user_id', currentUserId);
-        await supabase.from('profiles').delete().eq('id', currentUserId);
-        
-        // Log out (O usuário será removido do banco, mas a conta Auth precisa ser removida no painel ou via RPC se configurado)
-        await supabase.auth.signOut();
-        alert('Seus dados foram excluídos com sucesso.');
-      } catch (err) {
-        console.error("Erro ao excluir conta:", err);
-        alert('Erro ao excluir dados. Por favor, tente novamente.');
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
   const handleUpdatePhoto = async (file: File) => {
     const currentUserId = session?.user?.id;
     if (!currentUserId) {
@@ -372,7 +357,6 @@ export default function App() {
                   onLogout={handleLogout} 
                   onUpgrade={() => setActiveTab('planos')}
                   onUpdatePhoto={handleUpdatePhoto}
-                  onDeleteAccount={handleDeleteAccount}
                   setProfile={setProfile}
                 />;
               case 'planos': return <ScreenPlanos profile={profile} onSelect={() => setActiveTab('pagamento')} onBack={() => setActiveTab('inicio')} />;
@@ -480,9 +464,16 @@ function ScreenInicio({ file, setFile, loading, error, setError, handleAnalyze, 
   return (
     <div className="flex flex-col gap-12">
       <header className="flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg"><FileText className="text-white w-6 h-6" /></div>
-          <span className="text-xl font-black text-[#1E293B] tracking-tight">ExplicaFácil</span>
+        <div className="flex items-center gap-4">
+          {profile?.avatar_url ? (
+            <img src={profile.avatar_url} className="w-12 h-12 rounded-full border-2 border-white shadow-sm object-cover" />
+          ) : (
+            <div className="w-12 h-12 bg-slate-900 rounded-full flex items-center justify-center shadow-lg"><User className="text-white w-6 h-6" /></div>
+          )}
+          <div className="flex flex-col">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Olá,</span>
+            <span className="text-lg font-black text-[#1E293B] tracking-tight leading-none">{profile?.name || 'Explorador'}</span>
+          </div>
         </div>
         <div className={`px-5 py-2.5 rounded-full border flex items-center gap-2.5 ${profile?.plan_tier === 'premium' ? 'bg-green-50 border-green-100' : 'bg-slate-50 border-slate-100'}`}>
            <Star className={`w-4 h-4 ${profile?.plan_tier === 'premium' ? 'text-green-600 fill-green-600' : 'text-slate-400'}`} />
@@ -586,7 +577,7 @@ function ScreenHistorico({ history, profile, onView, onNew, onGoPlans, onDelete 
   );
 }
 
-function ScreenPerfil({ user, profile, onLogout, onUpgrade, onUpdatePhoto, onDeleteAccount, setProfile }: any) {
+function ScreenPerfil({ user, profile, onLogout, onUpgrade, onUpdatePhoto, setProfile }: any) {
   const isPremium = profile?.plan_tier === 'premium';
   const remaining = Math.max(0, (profile?.analysis_limit || 0) - (profile?.analysis_count || 0));
   const [isEditing, setIsEditing] = useState(!profile?.name || !profile?.phone);
@@ -788,13 +779,6 @@ function ScreenPerfil({ user, profile, onLogout, onUpgrade, onUpdatePhoto, onDel
              <button onClick={onUpgrade} className="w-full bg-white text-[#1E293B] py-5 rounded-[24px] font-black text-sm shadow-xl flex items-center justify-center gap-2">FAZER UPGRADE AGORA <Zap className="w-4 h-4 fill-[#1E293B]"/></button>
           </div>
         )}
-
-        <button 
-          onClick={onDeleteAccount}
-          className="w-full py-5 text-red-400 font-black text-[10px] tracking-[3px] uppercase hover:bg-red-50 rounded-3xl transition-all"
-        >
-          EXCLUIR MINHA CONTA E DADOS
-        </button>
       </div>
 
       {!isPremium && (
