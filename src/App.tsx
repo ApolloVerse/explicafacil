@@ -896,8 +896,8 @@ function ScreenPerfil({ user, profile, onLogout, onUpgrade, onUpdatePhoto, setPr
           {!isPremium && (
             <div className="grid grid-cols-2 gap-6 w-full">
                <div className="bg-white p-8 rounded-[40px] shadow-sm flex flex-col gap-4 border border-slate-100 hover:border-green-500/30 transition-colors">
-                  <span className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Análises Realizadas</span>
-                  <span className="text-5xl font-black text-[#1E293B]">{profile?.analysis_count}</span>
+                  <span className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Análises Possíveis</span>
+                  <span className="text-5xl font-black text-[#1E293B]">{remaining}</span>
                </div>
                <div onClick={onUpgrade} className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100 flex flex-col items-center justify-center cursor-pointer hover:border-[#22C55E] hover:bg-green-50 transition-all group">
                   <div className="w-16 h-16 bg-slate-50 group-hover:bg-green-100 rounded-2xl flex items-center justify-center transition-colors mb-2">
