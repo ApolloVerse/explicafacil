@@ -38,7 +38,7 @@ const saveLocalProfile = (profile: UserProfile) => localStorage.setItem(`explica
 export default function App() {
   const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('inicio');
   const [historyTabPreselected, setHistoryTabPreselected] = useState<AnalysisItem | null>(null);
   
