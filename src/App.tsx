@@ -885,10 +885,10 @@ function ScreenPerfil({ user, profile, onLogout, onUpgrade, onUpdatePhoto, setPr
                </div>
                <div className="flex justify-between items-center mb-6 relative z-10">
                   <span className="text-sm font-black uppercase tracking-widest text-slate-400">Tempo de Uso</span>
-                  <span className="text-green-500 font-black text-2xl">{remaining}</span>
+                  <span className="text-white font-black text-xl">{profile?.analysis_count || 0} de {profile?.analysis_limit || 3} <span className="text-green-400 text-sm">usos</span></span>
                </div>
                <div className="w-full h-4 bg-white/10 rounded-full overflow-hidden mb-8 relative z-10">
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${(remaining / 3) * 100}%` }} className="h-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, ((profile?.analysis_count || 0) / (profile?.analysis_limit || 3)) * 100)}%` }} className="h-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
                </div>
                <button onClick={onUpgrade} className="w-full bg-[#22C55E] text-white py-6 rounded-[28px] font-black text-sm shadow-xl flex items-center justify-center gap-2 hover:bg-green-400 transition-colors relative z-10">FAZER UPGRADE AGORA <Zap className="w-4 h-4 fill-white"/></button>
             </div>
@@ -1022,17 +1022,22 @@ function ScreenPagamento({ onBack, onConfirm }: any) {
          {paymentMethod === 'pix' ? (
             <div className="flex flex-col items-center gap-6 bg-slate-50 p-8 rounded-3xl border border-slate-100 border-dashed">
                <div className="p-5 bg-white rounded-[32px] shadow-sm border border-slate-100 flex items-center justify-center hover:shadow-md transition-shadow">
-                  <QRCodeCanvas value="00020126470014br.gov.bcb.pix0125linobotelho2121@gmail.com5204000053039865802BR5909CURTAMAIS6009Sao Paulo610901227-20062230519daqr1635057486071816304A4EB" size={180} level="M" />
+                  <QRCodeCanvas value="00020126470014br.gov.bcb.pix0125linobotelho2121@gmail.com520400005303986540519.905802BR5909CURTAMAIS6009Sao Paulo610901227-20062230519daqr1635057486071816304C3BF" size={180} level="M" />
                </div>
                <div className="flex flex-col items-center gap-2 w-full max-w-sm">
-                 <p className="text-[13px] font-bold text-slate-400 text-center px-4 leading-relaxed">
+                 <p className="text-[13px] font-bold text-slate-400 text-center px-4 leading-relaxed mb-2">
                     Escaneie o QR Code ou cole o código Pix abaixo no seu app de banco.
                  </p>
-                 <div className="flex items-center gap-2 mt-2 w-full bg-white p-2 rounded-2xl border border-slate-200 shadow-sm focus-within:border-green-500 focus-within:ring-2 focus-within:ring-green-500/20 transition-all">
-                   <input type="text" readOnly value="00020126470014br.gov.bcb.pix0125linobotelho2121@gmail.com5204000053039865802BR5909CURTAMAIS6009Sao Paulo610901227-20062230519daqr1635057486071816304A4EB" className="flex-1 bg-transparent text-xs text-slate-400 font-mono px-3 outline-none w-full truncate cursor-text" onClick={e => e.currentTarget.select()} />
-                   <button onClick={() => { navigator.clipboard.writeText("00020126470014br.gov.bcb.pix0125linobotelho2121@gmail.com5204000053039865802BR5909CURTAMAIS6009Sao Paulo610901227-20062230519daqr1635057486071816304A4EB"); alert("Código Copiado!"); }} className="bg-[#1E293B] text-white text-[11px] font-black uppercase px-5 py-3 rounded-xl hover:bg-black transition-colors shrink-0 flex items-center gap-2 active:scale-95 shadow-sm">Copiar</button>
+                 <div className="flex justify-center mt-1 w-full relative group">
+                   <div className="absolute inset-0 bg-green-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                   <button onClick={() => { navigator.clipboard.writeText("00020126470014br.gov.bcb.pix0125linobotelho2121@gmail.com520400005303986540519.905802BR5909CURTAMAIS6009Sao Paulo610901227-20062230519daqr1635057486071816304C3BF"); alert("Pix Copia e Cola copiado com sucesso!"); }} className="bg-[#1E293B] w-full text-white text-[13px] tracking-wide font-black uppercase px-6 py-4 rounded-2xl hover:bg-black transition-all flex items-center justify-center gap-3 active:scale-95 shadow-lg border border-slate-700 relative z-10 text-center">
+                     PIX COPIA E COLA 
+                     <span className="w-5 h-5 bg-white/10 rounded-md flex items-center justify-center">
+                       <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='13' height='13' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'%3E%3C/path%3E%3C/svg%3E" alt="copy" className="w-3 h-3 invert opacity-80" />
+                     </span>
+                   </button>
                  </div>
-                 <div className="flex items-center gap-2 mt-3 text-[10px] font-black text-green-700 bg-green-50/80 border border-green-100 px-4 py-2.5 rounded-full uppercase tracking-widest text-center shadow-sm">
+                 <div className="flex items-center gap-2 mt-4 text-[10px] font-black text-green-700 bg-green-50/80 border border-green-100 px-4 py-2.5 rounded-full uppercase tracking-widest text-center shadow-sm">
                    <ShieldCheck className="w-4 h-4" /> Beneficiário: CURTAMAIS
                  </div>
                </div>
