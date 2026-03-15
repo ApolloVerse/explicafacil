@@ -9,6 +9,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { analyzeDocument, askQuestion, analyzeDocumentStream } from './services/geminiService';
+import { paymentService, type PixPaymentResponse } from './services/paymentService';
 import { supabase, supabaseConfigured } from './lib/supabase';
 
 // --- Configuration ---
@@ -366,7 +367,7 @@ export default function App() {
                   setProfile={setProfile}
                 />;
               case 'planos': return <ScreenPlanos profile={profile} onSelect={() => setActiveTab('pagamento')} onBack={() => setActiveTab('inicio')} />;
-              case 'pagamento': return <ScreenPagamento onBack={() => setActiveTab('planos')} onConfirm={async () => {
+              case 'pagamento': return <ScreenPagamento user={session.user} onBack={() => setActiveTab('planos')} onConfirm={async () => {
                 const expiresAt = new Date();
                 expiresAt.setDate(expiresAt.getDate() + 30);
                 
@@ -962,26 +963,47 @@ function ScreenPlanos({ profile, onSelect, onBack }: any) {
   );
 }
 
-function ScreenPagamento({ onBack, onConfirm }: any) {
+function ScreenPagamento({ user, onBack, onConfirm }: any) {
   const [payLoading, setPayLoading] = useState(false);
   const [error, setError] = useState('');
+  const [pixData, setPixData] = useState<PixPaymentResponse | null>(null);
 
-  const handlePay = () => {
-    setError('');
-    setPayLoading(true);
-    setTimeout(onConfirm, 2000); // Simulando o tempo da API
-  };
-
+  // 1. Create PIX on mount
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (!payLoading) {
-      // Automatic confirmation simulation after 8 seconds
-      timer = setTimeout(() => {
-        handlePay();
-      }, 8000);
+    const initPix = async () => {
+      setPayLoading(true);
+      const data = await paymentService.createPixPayment(user.email);
+      if (data) {
+        setPixData(data);
+      } else {
+        setError('Não foi possível gerar o PIX. Tente novamente.');
+      }
+      setPayLoading(false);
+    };
+    initPix();
+  }, []);
+
+  // 2. Real-time Polling for confirmation
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (pixData && pixData.status !== 'approved') {
+      interval = setInterval(async () => {
+        const currentStatus = await paymentService.checkPaymentStatus(pixData.id);
+        if (currentStatus === 'approved') {
+          clearInterval(interval);
+          onConfirm();
+        }
+      }, 5000); // Check every 5s
     }
-    return () => clearTimeout(timer);
-  }, [payLoading]);
+    return () => clearInterval(interval);
+  }, [pixData]);
+
+  const handleCopy = () => {
+    if (pixData?.qr_code) {
+      navigator.clipboard.writeText(pixData.qr_code);
+      alert("Pix Copia e Cola copiado com sucesso!");
+    }
+  };
 
   return (
     <div className="flex flex-col gap-10 h-full bg-white p-6 md:p-12 rounded-[40px] shadow-sm min-h-[80vh]">
@@ -1027,38 +1049,43 @@ function ScreenPagamento({ onBack, onConfirm }: any) {
          {error && <div className="text-red-500 text-sm font-bold text-center px-4 py-3 bg-red-50 rounded-2xl">{error}</div>}
 
          
-            <div className="flex flex-col items-center gap-6 bg-slate-50 p-8 rounded-3xl border border-slate-100 border-dashed">
-               <div className="p-5 bg-white rounded-[32px] shadow-sm border border-slate-100 flex items-center justify-center hover:shadow-md transition-shadow relative">
-                  {payLoading && (
-                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm rounded-[32px] flex flex-col items-center justify-center z-10">
-                      <Loader2 className="w-10 h-10 text-green-500 animate-spin mb-2" />
-                      <span className="text-[10px] font-black tracking-widest uppercase text-green-600">Aprovando...</span>
+            <div className="flex flex-col items-center gap-6 bg-slate-50 p-8 rounded-3xl border border-slate-100 border-dashed min-h-[400px] justify-center">
+               {payLoading && !pixData ? (
+                 <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="w-12 h-12 text-slate-300 animate-spin" />
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Gerando PIX Dinâmico...</span>
+                 </div>
+               ) : pixData ? (
+                 <>
+                    <div className="p-5 bg-white rounded-[32px] shadow-sm border border-slate-100 flex items-center justify-center hover:shadow-md transition-shadow relative">
+                       <QRCodeCanvas value={pixData.qr_code} size={180} level="M" />
                     </div>
-                  )}
-                  <QRCodeCanvas value="00020126470014br.gov.bcb.pix0125linobotelho2121@gmail.com520400005303986540519.905802BR5910Core Build6009Sao Paulo610901227-20062230519daqr16350574860718163049522" size={180} level="M" />
-               </div>
-               <div className="flex flex-col items-center gap-2 w-full max-w-sm">
-                 <p className="text-[13px] font-bold text-slate-400 text-center px-4 leading-relaxed mb-2">
-                    Escaneie o QR Code ou cole o código Pix abaixo no seu app de banco.
-                 </p>
-                 <div className="flex justify-center mt-1 w-full relative group">
-                   <div className="absolute inset-0 bg-green-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                   <button onClick={() => { navigator.clipboard.writeText("00020126470014br.gov.bcb.pix0125linobotelho2121@gmail.com520400005303986540519.905802BR5910Core Build6009Sao Paulo610901227-20062230519daqr16350574860718163049522"); alert("Pix Copia e Cola copiado com sucesso!"); }} disabled={payLoading} className="bg-[#1E293B] w-full text-white text-[13px] tracking-wide font-black uppercase px-6 py-4 rounded-2xl hover:bg-black transition-all flex items-center justify-center gap-3 active:scale-95 shadow-lg border border-slate-700 relative z-10 text-center disabled:opacity-50">
-                     PIX COPIA E COLA 
-                     <span className="w-5 h-5 bg-white/10 rounded-md flex items-center justify-center">
-                       <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='13' height='13' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'%3E%3C/path%3E%3C/svg%3E" alt="copy" className="w-3 h-3 invert opacity-80" />
-                     </span>
-                   </button>
-                 </div>
-                 <div className="flex items-center gap-2 mt-4 text-[10px] font-black text-green-700 bg-green-50/80 border border-green-100 px-4 py-2.5 rounded-full uppercase tracking-widest text-center shadow-sm">
-                   <ShieldCheck className="w-4 h-4" /> Beneficiário: Core Build
-                 </div>
-               </div>
-               
-               <div className="w-full max-w-sm flex items-center justify-center gap-3 p-4">
-                 <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
-                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Aguardando Pagamento...</span>
-               </div>
+                    <div className="flex flex-col items-center gap-2 w-full max-w-sm">
+                      <p className="text-[13px] font-bold text-slate-400 text-center px-4 leading-relaxed mb-2">
+                         Escaneie o QR Code ou cole o código Pix abaixo no seu app de banco.
+                      </p>
+                      <div className="flex justify-center mt-1 w-full relative group">
+                        <div className="absolute inset-0 bg-green-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <button onClick={handleCopy} className="bg-[#1E293B] w-full text-white text-[13px] tracking-wide font-black uppercase px-6 py-4 rounded-2xl hover:bg-black transition-all flex items-center justify-center gap-3 active:scale-95 shadow-lg border border-slate-700 relative z-10 text-center disabled:opacity-50">
+                          PIX COPIA E COLA 
+                          <span className="w-5 h-5 bg-white/10 rounded-md flex items-center justify-center">
+                            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='13' height='13' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'%3E%3C/path%3E%3C/svg%3E" alt="copy" className="w-3 h-3 invert opacity-80" />
+                          </span>
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2 mt-4 text-[10px] font-black text-green-700 bg-green-50/80 border border-green-100 px-4 py-2.5 rounded-full uppercase tracking-widest text-center shadow-sm">
+                        <ShieldCheck className="w-4 h-4" /> Beneficiário: Core Build
+                      </div>
+                    </div>
+                    
+                    <div className="w-full max-w-sm flex items-center justify-center gap-3 p-4">
+                      <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Aguardando Confirmação Real...</span>
+                    </div>
+                 </>
+               ) : (
+                 <div className="text-red-400 text-center font-bold px-8">Erro ao carregar dados do pagamento.</div>
+               )}
             </div>
          
       </div>
