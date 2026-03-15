@@ -945,7 +945,7 @@ function ScreenPlanos({ profile, onSelect, onBack }: any) {
             </div>
             <ul className="flex flex-col gap-5 mb-12 flex-1">
                <PlanLi text="Análises Ilimitadas" active light />
-               <PlanLi text="Histórico Vitalício" active light />
+               <PlanLi text="Acesso Premium" active light />
                <PlanLi text="Chat Contextual IA" active light />
                <PlanLi text="Prioridade de Resposta" active light />
                <PlanLi text="Resumos Avançados" active light />
