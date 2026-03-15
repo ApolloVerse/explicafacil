@@ -95,22 +95,8 @@ export default function App() {
       setAuthLoading(false);
     });
 
-    const initAuth = async () => {
-      try {
-        const { data: { session: s } } = await supabase.auth.getSession();
-        if (mounted && s) {
-          setSession(s);
-          await syncUserData(s.user);
-          syncedRef.current = true;
-        }
-      } catch (err) {
-        console.warn("[AUTH] Initial session check failed.");
-      } finally {
-        setTimeout(() => { if (mounted) setAuthLoading(false); }, 1500);
-      }
-    };
-
-    initAuth();
+    // Forçar logout e não restaurar sessão automaticamente
+    setAuthLoading(false);
 
     const safetyTimer = setTimeout(() => {
       if (mounted && authLoading) {
@@ -438,7 +424,7 @@ function ScreenAuth({ onLoginGoogle }: any) {
         <div className="w-20 h-20 bg-[#22C55E] rounded-[28px] flex items-center justify-center shadow-2xl shadow-green-200 mb-8 rotate-3">
           <FileText className="text-white w-9 h-9" />
         </div>
-        <h1 className="text-4xl font-black text-[#1E293B] mb-2 tracking-tighter uppercase">ExplicaFácil</h1>
+        <h1 className="text-4xl font-black text-[#1E293B] mb-2 tracking-tighter uppercase">ExplicaFácil <span className="text-[10px] text-green-500 align-top">V2</span></h1>
         <p className="text-slate-400 font-bold mb-10 text-center px-10 leading-relaxed text-sm">Simplificando o mundo para você, um documento por vez.</p>
         
         <div className="w-full flex flex-col gap-5">
