@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#00c721",
+                        "background-light": "#f5f8f6",
+                        "background-dark": "#0f2312",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 antialiased font-display">
+<div class="relative flex h-auto min-h-screen w-full flex-col overflow-x-hidden">
+<!-- Header Section -->
+<header class="flex items-center bg-background-light dark:bg-background-dark p-4 justify-between sticky top-0 z-10 border-b border-primary/10">
+<div class="text-primary flex size-10 shrink-0 items-center justify-center cursor-pointer">
+<span class="material-symbols-outlined text-2xl">arrow_back</span>
+</div>
+<h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight tracking-tight flex-1 text-center">ExplicaFácil</h2>
+<div class="flex w-10 items-center justify-end">
+<button class="flex cursor-pointer items-center justify-center rounded-full h-10 w-10 bg-transparent text-slate-900 dark:text-slate-100">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</header>
+<!-- Search Bar -->
+<div class="px-4 py-4 bg-background-light dark:bg-background-dark">
+<label class="flex flex-col min-w-40 h-12 w-full">
+<div class="flex w-full flex-1 items-stretch rounded-xl h-full shadow-sm">
+<div class="text-primary flex border-none bg-primary/10 items-center justify-center pl-4 rounded-l-xl border-r-0">
+<span class="material-symbols-outlined">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-slate-900 dark:text-slate-100 focus:outline-0 focus:ring-0 border-none bg-primary/10 focus:border-none h-full placeholder:text-primary/60 px-4 rounded-l-none border-l-0 pl-2 text-base font-normal leading-normal" placeholder="Pesquisar documentos..." value=""/>
+</div>
+</label>
+</div>
+<!-- Main Content -->
+<main class="flex-1 px-4">
+<div class="flex items-center justify-between pb-4 pt-2">
+<h3 class="text-slate-900 dark:text-slate-100 tracking-tight text-2xl font-bold leading-tight">Meus Documentos</h3>
+<button class="text-primary text-sm font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-lg">filter_list</span>
+                    Filtrar
+                </button>
+</div>
+<!-- Documents List -->
+<div class="flex flex-col gap-3">
+<!-- Item 1 -->
+<div class="flex items-center gap-4 bg-white dark:bg-white/5 p-4 rounded-xl border border-primary/5 shadow-sm hover:border-primary/20 transition-all">
+<div class="text-primary flex items-center justify-center rounded-lg bg-primary/10 shrink-0 size-12">
+<span class="material-symbols-outlined text-3xl">description</span>
+</div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<p class="text-slate-900 dark:text-slate-100 text-base font-semibold leading-normal truncate">Contrato de Aluguel.doc</p>
+<p class="text-slate-500 dark:text-slate-400 text-xs font-normal leading-normal">Modificado em 10 Out 2023</p>
+</div>
+<div class="shrink-0">
+<button class="flex min-w-[80px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-8 px-4 bg-primary text-white text-xs font-bold leading-normal">
+<span>Ver mais</span>
+</button>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="flex items-center gap-4 bg-white dark:bg-white/5 p-4 rounded-xl border border-primary/5 shadow-sm hover:border-primary/20 transition-all">
+<div class="text-primary flex items-center justify-center rounded-lg bg-primary/10 shrink-0 size-12">
+<span class="material-symbols-outlined text-3xl">folder_zip</span>
+</div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<p class="text-slate-900 dark:text-slate-100 text-base font-semibold leading-normal truncate">Manual da Marca.pdf</p>
+<p class="text-slate-500 dark:text-slate-400 text-xs font-normal leading-normal">Modificado em 05 Out 2023</p>
+</div>
+<div class="shrink-0">
+<button class="flex min-w-[80px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-8 px-4 bg-primary text-white text-xs font-bold leading-normal">
+<span>Ver mais</span>
+</button>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="flex items-center gap-4 bg-white dark:bg-white/5 p-4 rounded-xl border border-primary/5 shadow-sm hover:border-primary/20 transition-all">
+<div class="text-primary flex items-center justify-center rounded-lg bg-primary/10 shrink-0 size-12">
+<span class="material-symbols-outlined text-3xl">article</span>
+</div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<p class="text-slate-900 dark:text-slate-100 text-base font-semibold leading-normal truncate">Novo Projeto.doc</p>
+<p class="text-slate-500 dark:text-slate-400 text-xs font-normal leading-normal">Modificado em Ontem, 14:30</p>
+</div>
+<div class="shrink-0">
+<button class="flex min-w-[80px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-8 px-4 bg-primary text-white text-xs font-bold leading-normal">
+<span>Ver mais</span>
+</button>
+</div>
+</div>
+<!-- Item 4 (Additional Context) -->
+<div class="flex items-center gap-4 bg-white dark:bg-white/5 p-4 rounded-xl border border-primary/5 shadow-sm hover:border-primary/20 transition-all">
+<div class="text-primary flex items-center justify-center rounded-lg bg-primary/10 shrink-0 size-12">
+<span class="material-symbols-outlined text-3xl">text_snippet</span>
+</div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<p class="text-slate-900 dark:text-slate-100 text-base font-semibold leading-normal truncate">Termos de Uso - ExplicaFacil.pdf</p>
+<p class="text-slate-500 dark:text-slate-400 text-xs font-normal leading-normal">Modificado em 01 Out 2023</p>
+</div>
+<div class="shrink-0">
+<button class="flex min-w-[80px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-8 px-4 bg-primary text-white text-xs font-bold leading-normal">
+<span>Ver mais</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Empty State Illustration Placeholder / Action Area -->
+<div class="mt-8 flex flex-col items-center justify-center p-8 rounded-xl bg-primary/5 border-2 border-dashed border-primary/20">
+<span class="material-symbols-outlined text-5xl text-primary/40 mb-2">upload_file</span>
+<p class="text-slate-600 dark:text-slate-400 text-sm text-center mb-4">Arraste novos documentos aqui ou clique para fazer upload</p>
+<button class="flex cursor-pointer items-center justify-center rounded-full h-10 px-6 bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20">
+                    Novo Documento
+                </button>
+</div>
+</main>
+<!-- Bottom Navigation Bar -->
+<footer class="sticky bottom-0 mt-auto border-t border-primary/10 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md px-4 pb-4 pt-2">
+<div class="flex gap-2">
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-slate-400 dark:text-slate-500 hover:text-primary transition-colors" href="#">
+<div class="flex h-8 items-center justify-center">
+<span class="material-symbols-outlined">home</span>
+</div>
+<p class="text-xs font-medium leading-normal tracking-tight">Início</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-primary" href="#">
+<div class="flex h-8 items-center justify-center">
+<span class="material-symbols-outlined material-symbols-fill">folder</span>
+</div>
+<p class="text-xs font-bold leading-normal tracking-tight">Documentos</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-slate-400 dark:text-slate-500 hover:text-primary transition-colors" href="#">
+<div class="flex h-8 items-center justify-center">
+<span class="material-symbols-outlined">menu_book</span>
+</div>
+<p class="text-xs font-medium leading-normal tracking-tight">Explicações</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-slate-400 dark:text-slate-500 hover:text-primary transition-colors" href="#">
+<div class="flex h-8 items-center justify-center">
+<span class="material-symbols-outlined">person</span>
+</div>
+<p class="text-xs font-medium leading-normal tracking-tight">Perfil</p>
+</a>
+</div>
+</footer>
+</div>
+</body></html>

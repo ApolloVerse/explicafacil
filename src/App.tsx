@@ -1,21 +1,49 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { 
-  Search, Bell, FileText, Upload, User, Calendar, 
-  ListTodo, MessageSquare, Settings, LogOut, 
-  CheckCircle2, Folder, ChevronDown, Activity, PlayCircle, Loader2, FileSearch, Send, X, ArrowRight
+  FileText, CheckCircle2, Loader2, Send, X, History, Home as HomeIcon, Upload, Search, Filter, 
+  MoreVertical, PlayCircle, Bell, User, Lock, Mail, Github, LogOut, Star, TrendingUp, ChevronRight,
+  ShieldCheck, CreditCard, Zap, Check, ArrowLeft, Camera, Shield, HelpCircle, Trash2, Pill, Stethoscope, Scale, Receipt, QrCode, Phone, Menu
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
-import { analyzeDocument, askQuestion } from './services/geminiService';
-import { supabase } from './lib/supabase'; // Import Supabase Client
+import { analyzeDocument, askQuestion, analyzeDocumentStream } from './services/geminiService';
+import { supabase, supabaseConfigured } from './lib/supabase';
 
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
+// --- Configuration ---
+const PREFER_MOCK = false; 
+
+// --- Types ---
+interface Message { role: 'user' | 'assistant'; content: string; }
+interface AnalysisItem { id: string; file_name: string; result: string; created_at: string; }
+interface UserProfile {
+  id: string;
+  name?: string;
+  email: string;
+  phone?: string;
+  avatar_url?: string;
+  plan_tier: 'free' | 'premium';
+  analysis_count: number;
+  analysis_limit: number;
+  premium_expires_at?: string;
 }
+type TabType = 'inicio' | 'historico' | 'explicações' | 'perfil' | 'planos' | 'pagamento';
+
+// --- Mock Storage Helpers ---
+const getLocalHistory = (): AnalysisItem[] => JSON.parse(localStorage.getItem('explica_history') || '[]');
+const saveLocalHistory = (history: AnalysisItem[]) => localStorage.setItem('explica_history', JSON.stringify(history));
+const getLocalProfile = (email: string, name: string = '', phone: string = ''): UserProfile => JSON.parse(localStorage.getItem(`explica_profile_${email}`) || `{"id":"mock-${Date.now()}","name":"${name}","email":"${email}","phone":"${phone}","plan_tier":"free","analysis_count":0,"analysis_limit":3}`);
+const saveLocalProfile = (profile: UserProfile) => localStorage.setItem(`explica_profile_${profile.email}`, JSON.stringify(profile));
 
 export default function App() {
+  const [session, setSession] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('inicio');
+  const [historyTabPreselected, setHistoryTabPreselected] = useState<AnalysisItem | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // App Logic State
   const [file, setFile] = useState<File | null>(null);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -23,614 +51,1099 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [analysisHistory, setAnalysisHistory] = useState<AnalysisItem[]>([]);
+  
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      setFile(acceptedFiles[0]);
-      setAnalysis(null);
-      setMessages([]);
-      setError(null);
+  // -- Supabase Auth & Data Sync --
+  const syncedRef = useRef(false);
+
+  useEffect(() => {
+    // Se o Supabase não está configurado, mostra a tela de login imediatamente
+    if (!supabaseConfigured) {
+      setAuthLoading(false);
+      return;
     }
+
+    let mounted = true;
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      if (!mounted) return;
+      
+      console.log(`[AUTH] Event: ${event}`);
+      setSession(newSession);
+      
+      if (newSession?.user) {
+        if (!syncedRef.current || !profile) {
+          await syncUserData(newSession.user);
+          syncedRef.current = true;
+        }
+      } else {
+        setProfile(null);
+        setAnalysisHistory([]);
+        syncedRef.current = false;
+      }
+      
+      setAuthLoading(false);
+    });
+
+    const initAuth = async () => {
+      try {
+        const { data: { session: s } } = await supabase.auth.getSession();
+        if (mounted && s) {
+          setSession(s);
+          await syncUserData(s.user);
+          syncedRef.current = true;
+        }
+      } catch (err) {
+        console.warn("[AUTH] Initial session check failed.");
+      } finally {
+        setTimeout(() => { if (mounted) setAuthLoading(false); }, 1500);
+      }
+    };
+
+    initAuth();
+
+    const safetyTimer = setTimeout(() => {
+      if (mounted && authLoading) {
+        setAuthLoading(false);
+      }
+    }, 6000);
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      clearTimeout(safetyTimer);
+    };
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.webp'],
-      'application/pdf': ['.pdf'],
-      'text/plain': ['.txt']
-    },
-    multiple: false
-  });
+  const syncUserData = async (authUser: any) => {
+    try {
+      let { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      const metadata = authUser.user_metadata;
+      
+      // Se o perfil não existir ou faltar dados básicos, usamos metadados do Google
+      if (!data || !data.name || !data.avatar_url) {
+        const updates: any = {};
+        if (!data?.name && (metadata?.full_name || metadata?.name)) {
+          updates.name = metadata.full_name || metadata.name;
+        }
+        if (!data?.avatar_url && (metadata?.avatar_url || metadata?.picture)) {
+          updates.avatar_url = metadata.avatar_url || metadata.picture;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          console.log("[SYNC] Permitting upsert with:", updates);
+          const { data: updated, error: upsertError } = await supabase
+            .from('profiles')
+            .upsert({ id: authUser.id, email: authUser.email, ...updates }, { onConflict: 'id' })
+            .select()
+            .single();
+          
+          if (updated) {
+            data = updated;
+            console.log("[SYNC] Profile successfully upserted.");
+          }
+          if (upsertError) {
+            console.error("[SYNC] Upsert error (Check RLS for INSERT):", upsertError);
+          }
+        }
+      }
+
+      if (data) {
+        setProfile(data);
+
+        // Fetch History
+        const { data: history } = await supabase
+          .from('analyses')
+          .select('*')
+          .eq('user_id', authUser.id)
+          .order('created_at', { ascending: false });
+        if (history) setAnalysisHistory(history);
+      }
+    } catch (err) {
+      console.error("Sync error:", err);
+    }
+  };
+
+  const fetchHistory = () => {
+    if (profile?.plan_tier === 'premium') {
+      setAnalysisHistory(getLocalHistory());
+    } else {
+      setAnalysisHistory([]);
+    }
+  };
+
+  const handleLoginGoogle = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { 
+        redirectTo: window.location.origin,
+        queryParams: {
+          prompt: 'select_account'
+        }
+      }
+    });
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setProfile(null);
+    setAnalysisHistory([]);
+    setActiveTab('inicio');
+  };
 
   const handleAnalyze = async () => {
-    if (!file) return;
+    if (!file || !session?.user || !profile) return;
+    if (profile.plan_tier === 'free' && profile.analysis_count >= profile.analysis_limit) {
+      setError("Limite gratuito atingido!");
+      setActiveTab('planos');
+      return;
+    }
+
     setLoading(true);
     setError(null);
-
+    setAnalysis(""); // Start empty for streaming
     try {
       const reader = new FileReader();
       reader.onload = async () => {
         const base64 = reader.result as string;
-        const result = await analyzeDocument(base64, file.type);
-        setAnalysis(result || "Não foi possível analisar o documento.");
-        
-        // Save to Supabase (if configured)
-        if (supabase) {
-          try {
-            await supabase.from('analyses').insert([{ file_name: file.name, result: result }]);
-          } catch(e) { console.error('Supabase save error', e); }
-        }
+        let accumulatedResult = "";
+        let firstChunk = true;
 
-        setLoading(false);
+        try {
+          const stream = analyzeDocumentStream(base64, file.type);
+          
+          for await (const chunk of stream) {
+            if (firstChunk) {
+              setLoading(false);
+              setActiveTab('explicações');
+              firstChunk = false;
+            }
+            accumulatedResult += chunk;
+            setAnalysis(accumulatedResult);
+          }
+
+          // DB SAVE: Save analysis to History
+          const { data: newEntry } = await supabase
+            .from('analyses')
+            .insert({
+              user_id: session.user.id,
+              file_name: file.name,
+              result: accumulatedResult
+            })
+            .select()
+            .single();
+
+          if (newEntry) {
+            setAnalysisHistory(prev => [newEntry, ...prev]);
+          }
+
+          // DB UPDATE: Increment count
+          const { data: updatedProfile } = await supabase
+            .from('profiles')
+            .update({ analysis_count: profile.analysis_count + 1 })
+            .eq('id', session.user.id)
+            .select()
+            .single();
+
+          if (updatedProfile) setProfile(updatedProfile);
+
+        } catch (err: any) {
+          console.error("Stream error details:", err);
+          const errorMsg = err.message || "Erro desconhecido";
+          setError(`Erro na conexão com a IA: ${errorMsg}`);
+          setLoading(false);
+        }
       };
       reader.readAsDataURL(file);
     } catch (err) {
-      console.error(err);
-      setError("Erro ao analisar documento.");
       setLoading(false);
+      setError("Erro ao ler o arquivo.");
     }
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || !analysis || chatLoading) return;
-
-    const userMessage = input.trim();
-    setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-    setChatLoading(true);
-
-    try {
-      const response = await askQuestion(analysis, userMessage);
-      const assistantMsg = response || "Desculpe, não consegui processar.";
-      setMessages(prev => [...prev, { role: 'assistant', content: assistantMsg }]);
-      
-      // Save chat to Supabase (if configured)
-      if (supabase) {
-        try {
-          await supabase.from('messages').insert([{ user_msg: userMessage, assist_msg: assistantMsg }]);
-        } catch(e) { console.error('Supabase save error', e); }
+  const handleDeleteHistory = async (id: string) => {
+    if (window.confirm('Excluir esta análise definitivamente?')) {
+      const { error } = await supabase.from('analyses').delete().eq('id', id);
+      if (!error) {
+        setAnalysisHistory(prev => prev.filter(item => item.id !== id));
       }
-
-    } catch (err) {
-      console.error(err);
-      setMessages(prev => [...prev, { role: 'assistant', content: "Erro na conexão." }]);
-    } finally {
-      setChatLoading(false);
-      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     }
   };
 
-  const reset = () => {
-    setFile(null);
-    setAnalysis(null);
-    setMessages([]);
-    setError(null);
+  const handleUpdatePhoto = async (file: File) => {
+    const currentUserId = session?.user?.id;
+    if (!currentUserId) {
+      alert("Erro: Usuário não identificado. Por favor, saia e entre novamente.");
+      return;
+    }
+    
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `${currentUserId}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      const finalUrl = `${publicUrl}?t=${Date.now()}`;
+
+      const { data: updatedProfile, error: updateError } = await supabase
+        .from('profiles')
+        .upsert({ 
+          id: currentUserId,
+          avatar_url: finalUrl,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' })
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+      
+      setProfile(updatedProfile);
+      alert('Foto atualizada com sucesso!');
+    } catch (error: any) {
+      alert('Erro ao carregar foto: ' + error.message);
+    }
   };
 
-  const currentDate = new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  const navItems = [
+    { id: 'inicio', icon: HomeIcon, label: 'INÍCIO' },
+    { id: 'historico', icon: History, label: 'HISTÓRICO' },
+    { id: 'planos', icon: Zap, label: 'PLANO' },
+    { id: 'perfil', icon: User, label: 'PERFIL' }
+  ];
+
+  const handleNavClick = (tab: TabType) => {
+    setActiveTab(tab);
+    setIsMobileMenuOpen(false);
+  };
+
+  const renderScreen = () => {
+    const variants = {
+      initial: { opacity: 0, x: 20, scale: 0.98 },
+      animate: { opacity: 1, x: 0, scale: 1 },
+      exit: { opacity: 0, x: -20, scale: 0.98 }
+    };
+
+    return (
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          variants={variants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="h-full"
+        >
+          {(() => {
+            switch (activeTab) {
+              case 'inicio': return <ScreenInicio {...{file, setFile, loading, error, setError, handleAnalyze, profile}} />;
+              case 'historico': return <ScreenHistorico history={analysisHistory} profile={profile} onView={(item) => { setAnalysis(item.result); setActiveTab('explicações'); }} onNew={() => setActiveTab('inicio')} onGoPlans={() => setActiveTab('planos')} onDelete={handleDeleteHistory} />;
+              case 'perfil':
+                return <ScreenPerfil 
+                  user={session.user} 
+                  profile={profile} 
+                  onLogout={handleLogout} 
+                  onUpgrade={() => setActiveTab('planos')}
+                  onUpdatePhoto={handleUpdatePhoto}
+                  setProfile={setProfile}
+                />;
+              case 'planos': return <ScreenPlanos profile={profile} onSelect={() => setActiveTab('pagamento')} onBack={() => setActiveTab('inicio')} />;
+              case 'pagamento': return <ScreenPagamento onBack={() => setActiveTab('planos')} onConfirm={async () => {
+                const expiresAt = new Date();
+                expiresAt.setDate(expiresAt.getDate() + 30);
+                
+                // Security Audit in Supabase
+                await supabase.from('payments').insert({
+                  user_id: session.user.id,
+                  amount: 19.90,
+                  method: 'pix'
+                });
+
+                const { data: updated } = await supabase
+                  .from('profiles')
+                  .update({ 
+                    plan_tier: 'premium', 
+                    premium_expires_at: expiresAt.toISOString() 
+                  })
+                  .eq('id', session.user.id)
+                  .select()
+                  .single();
+
+                if (updated) setProfile(updated);
+                setActiveTab('perfil');
+              }} />;
+              case 'explicações': return <ScreenExplicacoes analysis={analysis} messages={messages} setMessages={setMessages} input={input} setInput={setInput} chatLoading={chatLoading} setChatLoading={setChatLoading} chatEndRef={chatEndRef} onBack={() => { setAnalysis(null); setMessages([]); setActiveTab(profile?.plan_tier === 'premium' ? 'historico' : 'inicio'); }} />;
+              default: return <ScreenInicio {...{file, setFile, loading, error, setError, handleAnalyze, profile}} />;
+            }
+          })()}
+        </motion.div>
+      </AnimatePresence>
+    );
+  };
+
+  if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-white"><Loader2 className="animate-spin text-green-500 w-12 h-12" /></div>;
+  if (!session) return <ScreenAuth onLoginGoogle={handleLoginGoogle} />;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center p-4 lg:p-8 font-sans">
+    <div className="min-h-screen bg-[#F0F2F5] flex font-sans overflow-hidden">
+      {PREFER_MOCK && <div className="fixed top-4 left-4 z-[9999] bg-[#1E293B] text-white text-[10px] px-3 py-1 rounded-full font-black shadow-2xl border border-slate-700">PROTO-LOCAL</div>}
       
-      {/* App Container */}
-      <div className="w-full max-w-[1400px] h-[90vh] bg-[#F7F9FC] rounded-[32px] shadow-2xl overflow-hidden flex shadow-blue-500/20 ring-1 ring-white/60 relative">
+      {/* Desktop Sidebar (Left) */}
+      <aside className="hidden md:flex w-72 bg-white border-r border-slate-200 flex-col h-screen fixed top-0 left-0 z-40">
+        <div className="p-8 flex items-center gap-3">
+          <div className="w-12 h-12 bg-[#22C55E] rounded-2xl flex items-center justify-center shadow-lg transform rotate-3">
+            <FileText className="text-white w-6 h-6" />
+          </div>
+          <h1 className="text-2xl font-black text-[#1E293B] tracking-tighter uppercase">ExplicaFácil</h1>
+        </div>
+
+        <nav className="flex-1 px-4 flex flex-col gap-2 mt-4">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => handleNavClick(item.id as TabType)}
+              className={`flex items-center gap-4 px-6 py-4 rounded-2xl font-black transition-all ${
+                activeTab === item.id 
+                  ? 'bg-green-50 text-[#22C55E]' 
+                  : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+              }`}
+            >
+              <item.icon className="w-6 h-6" />
+              <span className="text-sm tracking-wider">{item.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-6">
+           <div className={`p-4 rounded-3xl flex items-center gap-4 ${profile?.plan_tier === 'premium' ? 'bg-[#1E293B] text-white' : 'bg-slate-100 text-slate-500'}`}>
+              <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
+                 {profile?.plan_tier === 'premium' ? <ShieldCheck className="w-5 h-5 text-green-400" /> : <Star className="w-5 h-5 text-slate-400" />}
+              </div>
+              <div className="flex flex-col">
+                 <span className="text-[10px] uppercase font-black tracking-widest opacity-60">Plano Atual</span>
+                 <span className="text-sm font-black capitalize">{profile?.plan_tier}</span>
+              </div>
+           </div>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-h-screen md:pl-72 w-full transition-all">
         
-        {/* Sidebar */}
-        <aside className="w-[84px] bg-white border-r border-slate-100 flex flex-col items-center py-8 z-10 shrink-0">
-          <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center mb-10 shadow-lg text-white">
-            <LayoutDashboardIcon className="w-6 h-6" />
-          </div>
-          
-          <nav className="flex flex-col gap-8 flex-1 w-full items-center">
-            <SidebarIcon icon={User} />
-            <SidebarIcon icon={Calendar} />
-            <SidebarIcon icon={ListTodo} active badge={3} />
-            <SidebarIcon icon={MessageSquare} />
-          </nav>
-          
-          <div className="flex flex-col gap-6 w-full items-center mt-auto">
-            <SidebarIcon icon={Settings} />
-            <SidebarIcon icon={LogOut} />
-          </div>
-        </aside>
+        {/* Mobile Top Bar */}
+        <div className="md:hidden bg-white/90 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
+           <div className="flex items-center gap-3">
+             <div className="w-10 h-10 bg-[#22C55E] rounded-xl flex items-center justify-center shadow-md transform rotate-3">
+               <FileText className="text-white w-5 h-5" />
+             </div>
+             <h1 className="text-xl font-black text-[#1E293B] tracking-tighter uppercase">ExplicaFácil</h1>
+           </div>
+           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 bg-slate-50 text-slate-600 rounded-xl">
+             {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+           </button>
+        </div>
 
-        {/* Main Content Area */}
-        <main className="flex-1 flex flex-col overflow-hidden bg-[#F7F9FC]">
-          
-          {/* Header */}
-          <header className="px-10 py-8 flex items-end justify-between shrink-0">
-            <div>
-              <h1 className="text-[28px] font-medium text-slate-800 tracking-tight leading-tight">Welcome, Daniel!</h1>
-              <p className="text-[13px] text-slate-500 font-medium mt-1">{currentDate}</p>
-            </div>
-            
-            <div className="flex items-center gap-6">
-              {/* Search */}
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                <input 
-                  type="text" 
-                  placeholder="Search" 
-                  className="w-64 pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium placeholder:text-slate-400 shadow-sm"
-                />
-              </div>
-              
-              {/* Notification */}
-              <button className="relative w-11 h-11 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-2 right-2.5 w-2 h-2 bg-blue-500 rounded-full border border-white"></span>
-              </button>
-            </div>
-          </header>
-
-          {/* Grid Content */}
-          <div className="flex-1 overflow-y-auto px-10 pb-10 custom-scrollbar">
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
-              
-              {/* Column 1: Profile & Team (3 spans) */}
-              <div className="xl:col-span-3 flex flex-col gap-6">
-                
-                {/* Profile Card */}
-                <div className="bg-[#6B9DF8] rounded-[24px] p-6 text-white relative overflow-hidden shadow-lg shadow-blue-500/20">
-                   {/* Decorative circle */}
-                  <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
-                  
-                  <div className="relative z-10 flex flex-col items-center">
-                    <div className="w-24 h-24 rounded-full border-4 border-white overflow-hidden bg-white mb-4 shadow-md">
-                       <img src="https://i.imgur.com/8Q5Z2g7.jpg" alt="Daniel" className="w-full h-full object-cover" />
-                    </div>
-                    <h2 className="text-xl font-semibold tracking-wide">Daniel Nixen</h2>
-                    <p className="text-blue-100 text-[13px] font-medium mb-5">UI&UX designer</p>
-                    
-                    <div className="w-full flex items-center gap-3 mb-6 bg-white/10 p-3 rounded-xl backdrop-blur-sm">
-                       <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
-                         <svg className="w-10 h-10 -rotate-90">
-                           <circle cx="20" cy="20" r="16" className="stroke-white/20 fill-none" strokeWidth="4" />
-                           <circle cx="20" cy="20" r="16" className="stroke-white fill-none" strokeWidth="4" strokeDasharray="100" strokeDashoffset="5" strokeLinecap="round" />
-                         </svg>
-                         <span className="absolute text-[10px] font-bold">95%</span>
-                       </div>
-                       <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
-                          <div className="w-[95%] h-full bg-white rounded-full"></div>
-                       </div>
-                    </div>
-                    
-                    <button className="w-full py-2.5 bg-white text-blue-600 font-semibold text-[13px] rounded-xl flex items-center justify-center gap-1.5 hover:bg-blue-50 transition-colors shadow-sm">
-                      <span className="text-blue-500 text-lg leading-none">+</span> Add your hobbies to complete your profile!
-                    </button>
-                  </div>
+        {/* Mobile Side Menu Overlay */}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <>
+              <motion.div 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="md:hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50"
+              />
+              <motion.div 
+                initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="md:hidden fixed top-0 right-0 bottom-0 w-4/5 max-w-sm bg-white z-50 shadow-2xl flex flex-col"
+              >
+                <div className="p-6 flex justify-between items-center border-b border-slate-100">
+                   <span className="text-xs font-black text-slate-400 tracking-widest uppercase">Menu</span>
+                   <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 hover:bg-slate-50 rounded-full text-slate-400"><X /></button>
                 </div>
-
-                {/* Your Team */}
-                <div className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100">
-                  <div className="flex justify-between items-center mb-5">
-                    <h3 className="font-semibold text-slate-800">Your team</h3>
-                    <button className="text-[13px] text-slate-400 font-medium hover:text-slate-600">Show all</button>
-                  </div>
-                  <div className="flex justify-between gap-1">
-                     <TeamMember name="Louise Green" role="Team-lead" img="https://i.imgur.com/w1v8XJ5.jpg" />
-                     <TeamMember name="Mark Fell" role="Art director" img="https://i.imgur.com/vH3yJt8.jpg" />
-                     <TeamMember name="Anna Fish" role="UI&UX designer" img="https://i.imgur.com/XqU7x58.jpg" />
-                  </div>
-                </div>
-
-                {/* Courses */}
-                <div className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100">
-                   <div className="flex justify-between items-center mb-5">
-                    <h3 className="font-semibold text-slate-800">Courses and webinars</h3>
-                    <button className="text-[13px] text-slate-400 font-medium hover:text-slate-600">Show all</button>
-                  </div>
-                  <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
-                     <CourseCard title="Webinar: Automation of Basic Processes" date="25 May, 11:00-12:00" />
-                     <CourseCard title="Situational Leadership as a Necessity" date="23 May, 11:00-12:00" />
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Column 2: Upload Area & Documents (5 spans) */}
-              <div className="xl:col-span-5 flex flex-col gap-6 h-full">
-                
-                {/* Stats row */}
-                <div className="grid grid-cols-2 gap-6">
-                   <div className="bg-white rounded-[20px] p-5 shadow-sm border border-slate-100">
-                     <div className="flex justify-between items-center mb-4">
-                       <span className="text-[13px] font-semibold text-slate-700">Meetings</span>
-                       <Activity className="w-4 h-4 text-slate-400" />
-                     </div>
-                     <div className="flex justify-between items-end">
-                       <span className="text-3xl font-bold text-slate-800 tracking-tight">2/3</span>
-                       <span className="text-xs font-bold text-slate-500">66%</span>
-                     </div>
-                     <div className="mt-3 w-full h-1.5 bg-slate-100 rounded-full flex">
-                       <div className="w-[66%] h-full bg-[#A2DA27] rounded-full"></div>
-                       <div className="w-[10%] h-full bg-slate-200 rounded-full ml-1"></div>
-                     </div>
-                   </div>
-                   <div className="bg-white rounded-[20px] p-5 shadow-sm border border-slate-100">
-                     <div className="flex justify-between items-center mb-4">
-                       <span className="text-[13px] font-semibold text-slate-700">Tasks completed</span>
-                       <Activity className="w-4 h-4 text-slate-400" />
-                     </div>
-                     <div className="flex justify-between items-end">
-                       <span className="text-3xl font-bold text-slate-800 tracking-tight">3/10</span>
-                       <span className="text-xs font-bold text-slate-500">32%</span>
-                     </div>
-                     <div className="mt-3 w-full h-1.5 bg-slate-100 rounded-full flex">
-                       <div className="w-[32%] h-full bg-[#A2DA27] rounded-full"></div>
-                       <div className="w-[10%] h-full bg-slate-200 rounded-full ml-1"></div>
-                     </div>
-                   </div>
-                </div>
-
-                {/* App Core: Document Upload instead of Progress Chart */}
-                <div className="bg-white rounded-[24px] p-8 shadow-sm border border-slate-100 flex-1 flex flex-col min-h-[340px] relative overflow-hidden">
-                  <div className="flex justify-between items-center mb-4">
-                     <div>
-                       <h3 className="font-semibold text-slate-800 mb-1">Document Analyzer</h3>
-                       <p className="text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
-                         Gemini AI <span className="text-[11px] font-bold px-2 py-0.5 bg-[#A2DA27]/20 text-green-700 rounded-md">Online</span>
-                       </p>
-                     </div>
-                     <div className="flex items-center gap-1 text-[13px] font-semibold text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg cursor-pointer">
-                        Format <ChevronDown className="w-4 h-4" />
-                     </div>
-                  </div>
-
-                  {!file ? (
-                    <div 
-                      {...getRootProps()} 
-                      className={`flex-1 w-full mt-4 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-4 transition-all cursor-pointer bg-slate-50
-                        ${isDragActive ? 'border-blue-400 bg-blue-50/50' : 'border-slate-200 hover:border-blue-300'}`}
+                <nav className="flex-1 p-6 flex flex-col gap-2">
+                  {navItems.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleNavClick(item.id as TabType)}
+                      className={`flex items-center gap-4 px-6 py-5 rounded-2xl font-black transition-all ${
+                        activeTab === item.id 
+                          ? 'bg-green-50 text-[#22C55E]' 
+                          : 'text-slate-400 hover:bg-slate-50'
+                      }`}
                     >
-                      <input {...getInputProps()} />
-                      <div className="bg-white p-4 rounded-2xl shadow-sm">
-                        <Upload className={`w-8 h-8 ${isDragActive ? 'text-blue-500' : 'text-slate-400'}`} />
-                      </div>
-                      <div className="text-center">
-                        <p className="text-[15px] font-medium text-slate-700">
-                          Drop your document to analyze
-                        </p>
-                        <p className="text-sm text-slate-400 mt-1">Accepts PDF, JPG, PNG & TXT</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex-1 w-full mt-4 flex flex-col items-center justify-center gap-5">
-                       <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center border border-blue-100 relative">
-                         <FileText className="w-8 h-8 text-blue-500" />
-                         <button onClick={reset} className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-sm border border-slate-200 hover:bg-red-50 hover:text-red-500">
-                           <X className="w-3 h-3" />
-                         </button>
-                       </div>
-                       <div className="text-center">
-                         <p className="font-semibold text-slate-800 truncate max-w-xs">{file.name}</p>
-                         <p className="text-xs text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                       </div>
-                       
-                       {!analysis && !loading && (
-                         <button
-                           onClick={handleAnalyze}
-                           className="mt-2 bg-slate-900 text-white px-8 py-3 rounded-xl font-semibold text-[15px] shadow-lg shadow-slate-900/20 hover:bg-slate-800 transition-all flex items-center gap-2"
-                         >
-                           Analyze Now <FileSearch className="w-4 h-4" />
-                         </button>
-                       )}
+                      <item.icon className="w-6 h-6" />
+                      <span className="text-base tracking-wider">{item.label}</span>
+                    </button>
+                  ))}
+                </nav>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
-                       {loading && (
-                         <div className="mt-2 flex items-center gap-3 text-blue-500 font-medium">
-                           <Loader2 className="w-5 h-5 animate-spin" /> Abstracting data...
-                         </div>
-                       )}
+        {/* Dynamic Screen Content Container */}
+        <div className="flex-1 overflow-y-auto w-full custom-scrollbar bg-[#F0F2F5] pb-24 md:pb-8 relative">
+           <div className="max-w-4xl mx-auto w-full p-6 md:p-10 min-h-full">
+              {renderScreen()}
+           </div>
+        </div>
 
-                       {error && (
-                         <div className="mt-2 text-sm text-red-500 font-medium bg-red-50 px-4 py-2 rounded-lg border border-red-100 text-center">
-                           {error}
-                         </div>
-                       )}
-                    </div>
-                  )}
-                  
-                  {/* Faint bar chart background decoration like design */}
-                  {!file && (
-                     <div className="absolute bottom-6 left-8 right-8 flex justify-between items-end h-24 opacity-10 pointer-events-none px-4">
-                        {[40, 60, 30, 80, 100, 50, 70].map((h, i) => (
-                           <div key={i} className="w-6 rounded-t-full bg-slate-900" style={{ height: `${h}%` }}></div>
-                        ))}
-                     </div>
-                  )}
-                </div>
-
-                {/* Documents Cards Bottom */}
-                <div className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100 mt-auto">
-                   <div className="flex justify-between items-center mb-5">
-                    <h3 className="font-semibold text-slate-800">Documents</h3>
-                    <button className="text-[13px] text-slate-400 font-medium hover:text-slate-600">Show all</button>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                     <FolderCard name="Employment Contract.doc" color="blue" />
-                     <FolderCard name="Brand Style Docume...doc" color="blue" />
-                     <FolderCard name="New project.doc" color="blue" />
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Column 3: "Task tracker" replaced by Analysis Chat (4 spans) */}
-              <div className="xl:col-span-4 bg-white rounded-[24px] p-6 shadow-sm border border-slate-100 flex flex-col h-[calc(100vh-12rem)] min-h-[700px]">
-                
-                <div className="flex justify-between items-center mb-6 shrink-0">
-                  <h3 className="font-semibold text-slate-800 text-lg">Ai Assistant Tracker</h3>
-                  <button className="text-[13px] text-slate-400 font-medium hover:text-slate-600">Show all</button>
-                </div>
-
-                {/* Tracker Tabs */}
-                <div className="flex items-center gap-1 bg-slate-50 rounded-full p-1 mb-6 shrink-0 border border-slate-100">
-                  <button className="flex-1 py-1.5 px-4 bg-white shadow-sm rounded-full text-[13px] text-slate-800 font-semibold border border-slate-200">Analysis</button>
-                  <button className="flex-1 py-1.5 px-4 rounded-full text-[13px] text-slate-500 font-medium hover:text-slate-700">Q&A Chat</button>
-                  <button className="flex-1 py-1.5 px-4 rounded-full text-[13px] text-slate-500 font-medium hover:text-slate-700">History</button>
-                </div>
-
-                {/* Main Content of Right Panel */}
-                <div className="flex-1 flex flex-col overflow-hidden">
-                  
-                  {!analysis ? (
-                    // Placeholder when no analysis
-                    <div className="flex-1 flex flex-col gap-5 overflow-y-auto pr-2 custom-scrollbar">
-                       <TrackerItem 
-                         title="Analyze a document to start" 
-                         subtitle="Upload via the central panel" 
-                         status="pending" 
-                         tag="Do this first" 
-                         userImg="https://i.imgur.com/w1v8XJ5.jpg"
-                         userName="System"
-                       />
-                       <TrackerItem 
-                         title="Ask questions about the content" 
-                         subtitle="Get immediate answers from Gemini" 
-                         status="locked" 
-                       />
-                       <TrackerItem 
-                         title="Store the data securely" 
-                         subtitle="Synced via Supabase database" 
-                         status="locked" 
-                       />
-                       
-                       <div className="mt-auto pt-6 border-t border-slate-100">
-                         <h4 className="font-semibold text-slate-800 mb-4">Goals tracker</h4>
-                         <p className="text-[13px] text-slate-500 leading-relaxed mb-4">These tools are designed to support your work flow during the first 2 weeks.</p>
-                         <div className="flex flex-col gap-4">
-                           <GoalItem icon={User} title="Get to know the AI" percent="72%" progress="72%" />
-                           <GoalItem icon={Settings} title="Upload your first doc" percent="0%" progress="0%" />
-                         </div>
-                       </div>
-                    </div>
-                  ) : (
-                    // Actual Document Analysis Result & Chat
-                    <div className="flex-1 flex flex-col min-h-0">
-                      
-                      {/* Read-only Analysis Result */}
-                      <div className="flex-1 overflow-y-auto pr-2 pb-4 mb-4 border-b border-slate-100 custom-scrollbar">
-                         <div className="flex items-center gap-3 mb-4">
-                           <CheckCircle2 className="w-5 h-5 text-[#A2DA27]" />
-                           <h4 className="font-semibold text-slate-800 text-[15px]">Analysis Complete</h4>
-                         </div>
-                         <div className="prose prose-sm prose-slate max-w-none text-[13.5px] leading-relaxed markdown-style">
-                           <Markdown>{analysis}</Markdown>
-                         </div>
-                      </div>
-
-                      {/* Q&A Chat Section */}
-                      <div className="h-[240px] flex flex-col bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden shrink-0">
-                        <div className="px-4 py-2 border-b border-slate-100 flex items-center gap-2 bg-white">
-                           <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                           <span className="text-[13px] font-semibold text-slate-700">Ask Gemini</span>
-                        </div>
-                        
-                        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 custom-scrollbar">
-                          {messages.length === 0 && (
-                            <p className="text-[13px] text-slate-400 text-center m-auto px-4 italic">
-                              Ask specific questions like "What is the penalty?" or "Summarize chapter 2".
-                            </p>
-                          )}
-                          <AnimatePresence initial={false}>
-                            {messages.map((msg, i) => (
-                              <motion.div
-                                key={i}
-                                initial={{ opacity: 0, y: 5 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                              >
-                                <div className={`max-w-[85%] p-2.5 rounded-2xl text-[13px] shadow-sm ${
-                                  msg.role === 'user' 
-                                    ? 'bg-slate-900 text-white rounded-tr-none' 
-                                    : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none'
-                                }`}>
-                                  {msg.content}
-                                </div>
-                              </motion.div>
-                            ))}
-                          </AnimatePresence>
-                          {chatLoading && (
-                            <div className="flex justify-start">
-                              <div className="bg-white border border-slate-100 p-3 rounded-2xl rounded-tl-none flex gap-1 shadow-sm">
-                                <span className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                                <span className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                                <span className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                              </div>
-                            </div>
-                          )}
-                          <div ref={chatEndRef} />
-                        </div>
-
-                        {/* Chat Input */}
-                        <form onSubmit={handleSendMessage} className="p-2 border-t border-slate-100 bg-white">
-                          <div className="relative flex items-center">
-                            <input
-                              type="text"
-                              value={input}
-                              onChange={(e) => setInput(e.target.value)}
-                              placeholder="Type a message..."
-                              className="w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[13px] focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all font-medium placeholder:text-slate-400"
-                            />
-                            <button
-                              type="submit"
-                              disabled={!input.trim() || chatLoading}
-                              className="absolute right-2 p-1.5 bg-transparent text-blue-600 rounded-lg hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                            >
-                              <Send className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </form>
-                      </div>
-
-                    </div>
-                  )}
-                  
-                </div>
-
-              </div>
-              
-            </div>
-          </div>
-        </main>
+        {/* Legacy/Mobile Bottom Navigation (Hidden on forms/chat) */}
+        {activeTab !== 'explicações' && activeTab !== 'pagamento' && (
+          <nav className="md:hidden fixed bottom-6 left-6 right-6 h-20 bg-white/90 backdrop-blur-xl border border-slate-100 rounded-[32px] flex items-center justify-around px-2 z-30 shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
+            {navItems.map(item => (
+              <NavItem key={item.id} icon={item.icon} label={item.label} active={activeTab === item.id} onClick={() => handleNavClick(item.id as TabType)} />
+            ))}
+          </nav>
+        )}
       </div>
 
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 5px;
-          height: 5px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #e2e8f0;
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #cbd5e1;
-        }
-        .markdown-style h1, .markdown-style h2 { font-size: 1.1em; font-weight: 700; margin-bottom: 0.5em; color: #1e293b; }
-        .markdown-style p { margin-bottom: 0.8em; color: #475569; }
-        .markdown-style ul { list-style: disc; margin-left: 1.2em; margin-bottom: 1em; color: #475569; }
-        .markdown-style strong { color: #1e293b; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
+        .dash-border { background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='40' ry='40' stroke='%2322C55E' stroke-width='4' stroke-dasharray='16%2c 16' stroke-dashoffset='0' stroke-linecap='round'/%3e%3c/svg%3e"); border-radius: 40px; }
+        .markdown-content h1 { font-size: 1.4rem; font-weight: 800; color: #1E293B; margin-bottom: 1rem; }
+        .markdown-content p { color: #64748B; margin-bottom: 1rem; line-height: 1.7; font-size: 1rem; }
+        .markdown-content strong { color: #334155; }
       `}</style>
     </div>
   );
 }
 
-// Mini Components to match Design Elements
+// --- Screens Components ---
 
-function SidebarIcon({ icon: Icon, active, badge }: { icon: any, active?: boolean, badge?: number }) {
+function ScreenAuth({ onLoginGoogle }: any) {
+  const [authError] = useState('');
+
   return (
-    <div className={`relative p-3 rounded-full cursor-pointer transition-colors ${active ? 'bg-slate-100 text-slate-900' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'}`}>
-      <Icon className="w-[22px] h-[22px]" />
-      {badge && (
-        <span className="absolute top-1 right-1 w-4 h-4 bg-blue-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">
-          {badge}
-        </span>
+    <div className="min-h-screen bg-[#F0F2F5] flex flex-col items-center justify-center p-6 w-full">
+      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-white p-12 rounded-[48px] shadow-2xl shadow-green-900/5 max-w-[480px] w-full flex flex-col items-center text-center">
+        <div className="w-24 h-24 bg-[#22C55E] rounded-[32px] flex items-center justify-center shadow-xl shadow-green-200 mb-8 rotate-3">
+          <FileText className="text-white w-10 h-10" />
+        </div>
+        <h1 className="text-5xl font-black text-[#1E293B] mb-4 tracking-tighter uppercase">ExplicaFácil</h1>
+        <p className="text-slate-400 font-bold mb-12 leading-relaxed text-sm px-4">Simplificando documentos complexos para você com inteligência artificial.</p>
+        
+        <div className="w-full flex flex-col gap-5">
+           {authError && <div className="text-red-500 text-sm font-bold text-center px-4 py-3 bg-red-50 rounded-2xl">{authError}</div>}
+           
+           <button onClick={onLoginGoogle} className="w-full bg-[#1E293B] text-white py-6 rounded-[32px] font-black shadow-xl hover:-translate-y-1 hover:shadow-2xl transition-all flex items-center justify-center gap-4">
+              <img src="https://www.google.com/favicon.ico" className="w-6 h-6 grayscale invert" alt="Google" /> CONTINUAR COM GOOGLE
+           </button>
+        </div>
+        
+        <p className="mt-12 text-[10px] text-slate-300 font-bold leading-loose uppercase tracking-widest">Ao continuar, você concorda com nossos <br/> <span className="text-[#22C55E] cursor-pointer hover:underline">Termos de Uso</span> e <span className="text-[#22C55E] cursor-pointer hover:underline">Privacidade</span></p>
+      </motion.div>
+    </div>
+  );
+}
+
+function ScreenInicio({ file, setFile, loading, error, setError, handleAnalyze, profile }: any) {
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: (accepted) => { if (accepted.length > 0) { setFile(accepted[0]); setError?.(null); } },
+    accept: { 'image/*': ['.jpeg', '.jpg', '.png'], 'application/pdf': ['.pdf'] }
+  });
+
+  return (
+    <div className="flex flex-col gap-10 md:gap-14 bg-white p-6 md:p-12 rounded-[40px] shadow-sm">
+      <header className="flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          {profile?.avatar_url ? (
+            <img src={profile.avatar_url} className="w-12 h-12 rounded-full border-2 border-white shadow-sm object-cover" />
+          ) : (
+            <div className="w-12 h-12 bg-slate-900 rounded-full flex items-center justify-center shadow-lg"><User className="text-white w-6 h-6" /></div>
+          )}
+          <div className="flex flex-col">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Olá,</span>
+            <span className="text-lg font-black text-[#1E293B] tracking-tight leading-none">{profile?.name || 'Explorador'}</span>
+          </div>
+        </div>
+        <div className={`px-5 py-2.5 rounded-full border flex items-center gap-2.5 ${profile?.plan_tier === 'premium' ? 'bg-green-50 border-green-100' : 'bg-slate-50 border-slate-100'}`}>
+           <Star className={`w-4 h-4 ${profile?.plan_tier === 'premium' ? 'text-green-600 fill-green-600' : 'text-slate-400'}`} />
+           <span className={`text-[11px] font-black uppercase tracking-widest ${profile?.plan_tier === 'premium' ? 'text-green-700' : 'text-slate-500'}`}>{profile?.plan_tier}</span>
+        </div>
+      </header>
+
+      <div className="text-center px-2">
+        <h2 className="text-[44px] leading-[1] font-black text-[#1E293B] mb-6 tracking-tight">Qual documento <br/><span className="text-green-500">vamos ler agora?</span></h2>
+      </div>
+
+      <div {...getRootProps()} className={`relative h-[480px] w-full dash-border flex flex-col items-center justify-center p-8 transition-all duration-300 ${isDragActive ? 'bg-green-50 scale-102' : 'bg-white shadow-inner'}`}>
+         <input {...getInputProps()} />
+         <div className="w-28 h-28 bg-[#22C55E] rounded-full flex items-center justify-center shadow-2xl shadow-green-200 mb-8 mt-[-10px] animate-bounce-slow"><Upload className="text-white w-10 h-10" /></div>
+         <p className="text-[22px] font-black text-[#1E293B] text-center mb-2 px-10">Envie o arquivo aqui</p>
+         <p className="text-slate-400 font-bold text-sm mb-12">PDF, JPEG ou PNG até 20MB</p>
+         <button className="px-12 py-5 bg-white text-[#22C55E] font-black text-base rounded-full shadow-xl border border-slate-50 hover:scale-105 transition-transform">SELECIONAR ARQUIVO</button>
+
+         {file && (
+           <div className="absolute inset-0 bg-white/98 rounded-[40px] flex flex-col items-center justify-center p-8 z-10">
+              <div className="w-24 h-24 bg-blue-50 rounded-3xl flex items-center justify-center mb-6 shadow-xl"><FileText className="w-12 h-12 text-blue-500" /></div>
+              <p className="text-xl font-black text-[#1E293B] mb-6 px-6 text-center leading-tight">{file.name}</p>
+              
+              {error && (
+                <div className="w-full px-6 mb-6">
+                  <div className="bg-red-50 text-red-500 px-4 py-3 rounded-2xl font-bold text-sm text-center border border-red-100 flex items-center justify-center gap-2">
+                    <X className="w-4 h-4" /> {error}
+                  </div>
+                </div>
+              )}
+
+              {!loading ? (
+                <div className="flex flex-col gap-4 w-full px-6">
+                  <button onClick={(e) => {e.stopPropagation(); handleAnalyze();}} className="w-full py-6 bg-[#22C55E] text-white font-black rounded-3xl shadow-2xl shadow-green-100 flex items-center justify-center gap-3">ANALISAR AGORA <ChevronRight className="w-5 h-5"/></button>
+                  <button onClick={(e) => {e.stopPropagation(); setFile(null); setError?.(null);}} className="text-slate-400 font-black text-sm uppercase tracking-widest mt-2">CANCELAR</button>
+                </div>
+              ) : <div className="flex flex-col items-center gap-4"><Loader2 className="animate-spin text-green-500 w-10 h-10" /><span className="text-green-600 font-black text-sm uppercase tracking-widest">O Gênio está lendo...</span></div>}
+           </div>
+         )}
+      </div>
+
+      <div className="w-full">
+        <h3 className="text-[14px] font-black text-[#94A3B8] uppercase tracking-[3px] mb-6 md:mb-8 px-2">Sugestões de Análise</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+           <QuickAction icon={Shield} label="Contratos" sub="Aluguel, Trabalho" />
+           <QuickAction icon={Pill} label="Bulas" sub="Como usar, Riscos" />
+           <QuickAction icon={Stethoscope} label="Exames" sub="Saúde e Laudos" />
+           <QuickAction icon={Receipt} label="Contas" sub="Cobranças e Taxas" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ScreenHistorico({ history, profile, onView, onNew, onGoPlans, onDelete }: any) {
+  const isPremium = profile?.plan_tier === 'premium';
+
+  return (
+    <div className="flex flex-col gap-10 bg-white p-6 md:p-12 rounded-[40px] shadow-sm min-h-[80vh]">
+      <div className="flex justify-between items-center px-1">
+        <h2 className="text-3xl font-black text-[#1E293B]">Histórico</h2>
+        <div className="p-3 bg-slate-50 rounded-2xl"><Search className="text-slate-400 w-6 h-6" /></div>
+      </div>
+
+      {!isPremium ? (
+        <div className="bg-[#1E293B] p-10 rounded-[40px] text-white flex flex-col items-center text-center gap-8 shadow-2xl max-w-xl mx-auto w-full mt-10">
+           <div className="w-20 h-20 bg-green-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-green-500/20"><Lock className="w-10 h-10" /></div>
+           <div className="flex flex-col gap-3">
+              <h3 className="text-2xl font-black">Histórico Premium</h3>
+              <p className="text-slate-400 font-bold leading-relaxed px-2">No plano Free suas análises não ficam salvas. Mude para o Premium para salvar tudo!</p>
+           </div>
+           <button onClick={onGoPlans} className="w-full bg-[#22C55E] text-white py-6 rounded-[24px] font-black shadow-lg hover:scale-105 transition-transform">LIBERAR AGORA</button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+           <div className="col-span-full">
+               <button onClick={onNew} className="w-full md:w-auto px-10 bg-slate-50 text-slate-400 py-6 rounded-[24px] font-black border-2 border-dashed border-slate-100 flex items-center justify-center gap-3 hover:bg-slate-100 transition-all"><Upload className="w-6 h-6" /> NOVA ANÁLISE</button>
+           </div>
+           
+           {history.length > 0 ? (
+              history.map((item: any) => (
+               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} key={item.id} className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center justify-between hover:border-green-500/30 hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group">
+                  <div className="flex items-center gap-5 overflow-hidden flex-1" onClick={() => onView(item)}>
+                    <div className="w-16 h-16 bg-green-50 rounded-2xl flex items-center justify-center shrink-0 group-hover:bg-[#22C55E] transition-colors"><FileText className="text-green-500 group-hover:text-white w-8 h-8 transition-colors" /></div>
+                    <div className="overflow-hidden">
+                       <p className="text-lg font-black text-[#1E293B] truncate">{item.file_name}</p>
+                       <p className="text-xs font-bold text-slate-300 mt-1 uppercase group-hover:text-green-600 transition-colors">{new Date(item.created_at).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="p-3 text-red-300 hover:bg-red-50 hover:text-red-500 rounded-xl transition-all opacity-100 md:opacity-0 group-hover:opacity-100">
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                    <ChevronRight className="text-slate-200 group-hover:text-green-500 transition-colors" onClick={() => onView(item)} />
+                  </div>
+               </motion.div>
+             ))
+           ) : (
+             <div className="text-center py-20 col-span-full"><p className="text-slate-300 font-black uppercase tracking-widest text-sm">Nenhuma análise salva</p></div>
+           )}
+        </div>
       )}
     </div>
   );
 }
 
-function LayoutDashboardIcon(props: any) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <rect x="3" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" />
-      <rect x="3" y="14" width="7" height="7" rx="1" />
-    </svg>
-  );
-}
+function ScreenPerfil({ user, profile, onLogout, onUpgrade, onUpdatePhoto, setProfile }: any) {
+  const isPremium = profile?.plan_tier === 'premium';
+  const remaining = Math.max(0, (profile?.analysis_limit || 0) - (profile?.analysis_count || 0));
+  const [isEditing, setIsEditing] = useState(!profile?.name || !profile?.phone);
+  const [editName, setEditName] = useState(profile?.name || '');
+  const [editPhone, setEditPhone] = useState(profile?.phone || '');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-function TeamMember({ name, role, img }: { name: string, role: string, img: string }) {
+  useEffect(() => {
+    if (profile && !isEditing) {
+      setEditName(profile.name || '');
+      setEditPhone(profile.phone || '');
+    }
+    if (profile?.avatar_url) {
+      setPreviewUrl(null);
+    }
+  }, [profile, isEditing]);
+
+  const formatPhone = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    const charCount = Math.min(numbers.length, 11);
+    const masked = numbers.slice(0, charCount);
+    if (charCount <= 2) return masked;
+    if (charCount <= 7) return `(${masked.slice(0, 2)}) ${masked.slice(2)}`;
+    return `(${masked.slice(0, 2)}) ${masked.slice(2, 7)}-${masked.slice(7)}`;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditPhone(formatPhone(e.target.value));
+  };
+
+  const handlePhotoClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+      onUpdatePhoto(file);
+    }
+  };
+
+  const handleSave = async () => {
+    const currentUserId = user?.id || profile?.id;
+    if (!currentUserId) {
+      alert("Erro: Usuário não identificado.");
+      return;
+    }
+
+    if (!editName.trim()) {
+      alert("Por favor, preencha o seu nome.");
+      return;
+    }
+
+    const digitsOnly = editPhone.replace(/\D/g, '');
+    if (digitsOnly.length !== 11) {
+      alert("Por favor, insira um número de telefone válido com DDD (11 dígitos). Ex: (11) 98888-7777");
+      return;
+    }
+
+    setIsSaving(true);
+    const updatedData = {
+      ...(profile as any),
+      name: editName.trim(),
+      phone: editPhone,
+      updated_at: new Date().toISOString()
+    };
+    setProfile(updatedData);
+    if (profile?.email) {
+      saveLocalProfile(updatedData);
+    }
+
+    setShowSuccess(true);
+    setIsSaving(false);
+    setTimeout(() => {
+      setShowSuccess(false);
+      setIsEditing(false);
+    }, 800);
+
+    supabase
+      .from('profiles')
+      .upsert({ 
+        id: currentUserId,
+        name: editName.trim(), 
+        phone: editPhone,
+        email: profile?.email,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' })
+      .select()
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn("[PROFILE] DB sync failed (RLS?). Data saved locally:", error.message);
+        } else if (data) {
+          setProfile(data);
+          console.log("[PROFILE] DB sync successful.");
+        }
+      });
+  };
+
   return (
-    <div className="flex flex-col items-center">
-       <div className="relative w-11 h-11 rounded-full overflow-hidden border border-slate-100 bg-slate-50 group cursor-pointer hover:ring-2 hover:ring-blue-500/50 transition-all shadow-sm">
-         <img src={img} alt={name} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
-         <div className="absolute -bottom-1 -right-1 bg-white p-0.5 rounded-full">
-           <div className="w-3.5 h-3.5 bg-blue-500 rounded-full flex items-center justify-center">
-             <ArrowRight className="w-2 h-2 text-white -rotate-45" />
+    <div className="flex flex-col gap-10">
+      <div className="flex justify-between items-center">
+        <h2 className="text-3xl font-black text-[#1E293B]">Meu Perfil</h2>
+        <button onClick={onLogout} className="p-3 bg-red-50 text-red-400 rounded-2xl active:scale-95 transition-all hover:bg-red-100"><LogOut className="w-6 h-6" /></button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+        <div className="bg-white p-10 rounded-[44px] shadow-sm flex flex-col items-center relative w-full border border-slate-100">
+           <input 
+             type="file" 
+             ref={fileInputRef} 
+             onChange={handleFileChange} 
+             className="hidden" 
+             accept="image/*" 
+           />
+           <div onClick={handlePhotoClick} className="w-32 h-32 bg-slate-50 rounded-[40px] flex items-center justify-center mb-8 shadow-inner overflow-hidden border-4 border-white relative cursor-pointer group hover:shadow-md transition-shadow">
+              {profile?.avatar_url || previewUrl ? (
+                <img src={previewUrl || profile?.avatar_url} className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-14 h-14 text-slate-200" />
+              )}
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Camera className="text-white" /></div>
            </div>
-         </div>
-       </div>
-       <p className="text-[12px] font-semibold text-slate-800 mt-2 truncate max-w-[60px]">{name}</p>
-       <p className="text-[10px] text-slate-400 font-medium">{role}</p>
-    </div>
-  );
-}
 
-function CourseCard({ title, date }: { title: string, date: string }) {
-  return (
-    <div className="min-w-[150px] bg-slate-50 border border-slate-100 rounded-xl p-4 shrink-0 transition-transform hover:-translate-y-1 cursor-pointer">
-       <p className="text-[13px] font-semibold text-slate-800 leading-tight mb-3">{title}</p>
-       <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
-         <Calendar className="w-3 h-3 text-slate-400" />
-         {date}
-       </div>
-    </div>
-  );
-}
+           {isEditing ? (
+              <div className="w-full flex flex-col gap-4 mt-2">
+                 <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-black text-slate-300 uppercase px-4">Nome Completo</span>
+                    <input type="text" value={editName} onChange={e => setEditName(e.target.value)} placeholder="Seu nome" className="w-full bg-slate-50 border border-slate-200 px-6 py-4 rounded-2xl font-bold text-[#1E293B] focus:border-green-500 focus:bg-white outline-none transition-all shadow-inner" />
+                 </div>
+                 <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-black text-slate-300 uppercase px-4">WhatsApp (Telefone)</span>
+                    <input type="tel" value={editPhone} onChange={handlePhoneChange} placeholder="(00) 00000-0000" className="w-full bg-slate-50 border border-slate-200 px-6 py-4 rounded-2xl font-bold text-[#1E293B] focus:border-green-500 focus:bg-white outline-none transition-all shadow-inner" />
+                 </div>
+                  <button 
+                    onClick={handleSave} 
+                    disabled={isSaving || showSuccess}
+                    className={`relative overflow-hidden py-4 rounded-2xl font-black shadow-lg mt-4 transition-all text-white ${showSuccess ? 'bg-blue-500 cursor-default' : 'bg-[#22C55E] hover:bg-green-500 hover:shadow-green-500/30'}`}
+                  >
+                    <AnimatePresence mode="wait">
+                      {isSaving ? (
+                        <motion.div key="saving" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center justify-center gap-2">
+                          <Loader2 className="w-5 h-5 animate-spin" /> SALVANDO...
+                        </motion.div>
+                      ) : showSuccess ? (
+                        <motion.div key="success" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex items-center justify-center gap-2">
+                          <CheckCircle2 className="w-5 h-5" /> PERFIL SALVO!
+                        </motion.div>
+                      ) : (
+                        <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                          SALVAR DADOS
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </button>
+              </div>
+           ) : (
+              <>
+                  <h3 className="text-3xl font-black text-[#1E293B] mb-1 text-center">{profile?.name || 'Seu Nome'}</h3>
+                  <p className="text-slate-400 font-bold mb-1 text-center">{user.email}</p>
+                  <p className="text-slate-400 font-bold text-sm mb-6 text-center">{profile?.phone || '(00) 00000-0000'}</p>
+                 <button onClick={() => setIsEditing(true)} className="text-[10px] font-black text-slate-500 hover:text-[#22C55E] hover:bg-green-50 uppercase tracking-widest bg-slate-50 px-6 py-3 rounded-xl mb-4 transition-colors shadow-sm">Editar Perfil</button>
+              </>
+           )}
+           
+           <div className={`mt-4 px-8 py-3 rounded-full font-black text-[10px] tracking-[4px] shadow-sm flex items-center gap-3 ${isPremium ? 'bg-green-500 text-white' : 'bg-[#1E293B] text-white'}`}>
+              {isPremium ? <ShieldCheck className="w-4 h-4" /> : <Star className="w-4 h-4" />}
+              PLANO {profile?.plan_tier.toUpperCase()}
+           </div>
 
-function FolderCard({ name, color }: { name: string, color: string }) {
-  return (
-    <div className="flex flex-col items-center gap-2 cursor-pointer group">
-       <div className="relative">
-         <svg width="74" height="54" viewBox="0 0 74 54" fill="none" xmlns="http://www.w3.org/2000/svg" className="group-hover:scale-105 transition-transform drop-shadow-sm">
-            <path d="M0 6C0 2.68629 2.68629 0 6 0H26.5412C28.47 0 30.2764 0.934444 31.396 2.51351L34.1983 6.46581C35.3178 8.04488 37.1242 8.97932 39.0531 8.97932H68C71.3137 8.97932 74 11.6656 74 14.9793V48C74 51.3137 71.3137 54 68 54H6C2.68629 54 0 51.3137 0 48V6Z" fill="#93C5FD"/>
-            <path d="M0 16C0 12.6863 2.68629 10 6 10H68C71.3137 10 74 12.6863 74 16V48C74 51.3137 71.3137 54 68 54H6C2.68629 54 0 51.3137 0 48V16Z" fill="#BFDBFE" fillOpacity="0.8"/>
-            <path d="M0 24C0 20.6863 2.68629 18 6 18H68C71.3137 18 74 20.6863 74 24V48C74 51.3137 71.3137 54 68 54H6C2.68629 54 0 51.3137 0 48V24Z" fill="#DBEAFE"/>
-         </svg>
-       </div>
-       <p className="text-[11px] font-medium text-slate-600 text-center leading-tight truncate max-w-[70px]">{name}</p>
-    </div>
-  );
-}
+           {isPremium && profile?.premium_expires_at && (
+             <div className="mt-4 text-[11px] font-black text-amber-600 flex items-center gap-2 bg-amber-50 px-4 py-2.5 rounded-full uppercase tracking-wider">
+               <Star className="w-3.5 h-3.5" /> Expirará em {new Date(profile.premium_expires_at).toLocaleDateString()}
+             </div>
+           )}
+        </div>
 
-function TrackerItem({ title, subtitle, status, tag, userImg, userName }: any) {
-  return (
-    <div className="flex gap-4 items-start group">
-       <div className="mt-1">
-         {status === 'pending' && <div className="w-[18px] h-[18px] rounded-full border-2 border-blue-500 bg-white shadow-sm flex items-center justify-center"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div></div>}
-         {status === 'completed' && <CheckCircle2 className="w-5 h-5 text-blue-500" />}
-         {status === 'locked' && <div className="w-[18px] h-[18px] rounded-full border-2 border-slate-200 bg-white"></div>}
-       </div>
-       <div className="flex-1 border-b border-slate-100 pb-4 group-last:border-0">
-          <div className="flex justify-between items-start mb-1">
-             <h4 className={`text-[14px] font-semibold ${status === 'locked' ? 'text-slate-400' : 'text-slate-800'}`}>{title}</h4>
-             {tag && <span className="text-[11px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded flex items-center gap-1"><span className="text-blue-400 text-sm">✦</span> {tag}</span>}
-          </div>
-          <p className="text-[12px] text-slate-500 mb-2">{subtitle}</p>
-          {userImg && (
-            <div className="flex items-center gap-2">
-               <span className="text-[11px] text-slate-400 font-medium">Deadline: Today</span>
-               <div className="flex items-center gap-1">
-                  <img src={userImg} alt="" className="w-4 h-4 rounded-full object-cover grayscale" />
-                  <span className="text-[11px] text-slate-600 font-medium">{userName}</span>
+        <div className="flex flex-col gap-6 w-full">
+          {!isPremium && (
+            <div className="bg-[#1E293B] p-10 rounded-[44px] text-white shadow-2xl relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-8 opacity-10">
+                 <Zap className="w-32 h-32" />
+               </div>
+               <div className="flex justify-between items-center mb-6 relative z-10">
+                  <span className="text-sm font-black uppercase tracking-widest text-slate-400">Tempo de Uso</span>
+                  <span className="text-green-500 font-black text-2xl">{remaining}</span>
+               </div>
+               <div className="w-full h-4 bg-white/10 rounded-full overflow-hidden mb-8 relative z-10">
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${(remaining / 3) * 100}%` }} className="h-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
+               </div>
+               <button onClick={onUpgrade} className="w-full bg-[#22C55E] text-white py-6 rounded-[28px] font-black text-sm shadow-xl flex items-center justify-center gap-2 hover:bg-green-400 transition-colors relative z-10">FAZER UPGRADE AGORA <Zap className="w-4 h-4 fill-white"/></button>
+            </div>
+          )}
+
+          {!isPremium && (
+            <div className="grid grid-cols-2 gap-6 w-full">
+               <div className="bg-white p-8 rounded-[40px] shadow-sm flex flex-col gap-4 border border-slate-100 hover:border-green-500/30 transition-colors">
+                  <span className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Análises Realizadas</span>
+                  <span className="text-5xl font-black text-[#1E293B]">{profile?.analysis_count}</span>
+               </div>
+               <div onClick={onUpgrade} className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100 flex flex-col items-center justify-center cursor-pointer hover:border-[#22C55E] hover:bg-green-50 transition-all group">
+                  <div className="w-16 h-16 bg-slate-50 group-hover:bg-green-100 rounded-2xl flex items-center justify-center transition-colors mb-2">
+                    <TrendingUp className="text-slate-300 group-hover:text-green-500 w-8 h-8 transition-colors" />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center mt-2 group-hover:text-green-600">Ver Vantagens<br/>Premium</span>
                </div>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ScreenPlanos({ profile, onSelect, onBack }: any) {
+  return (
+    <div className="flex flex-col gap-10 bg-white p-6 md:p-12 rounded-[40px] shadow-sm min-h-[80vh]">
+      <div className="flex items-center gap-4">
+        <button onClick={onBack} className="p-3 bg-slate-50 hover:bg-slate-100 rounded-2xl transition-colors"><ArrowLeft className="text-slate-400" /></button>
+        <h2 className="text-3xl font-black text-[#1E293B]">Nossos Planos</h2>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto w-full mt-4">
+         <div className={`p-10 rounded-[48px] border-2 bg-white transition-all flex flex-col h-full ${profile?.plan_tier === 'free' ? 'border-blue-100 bg-blue-50/10 shadow-lg scale-[1.02]' : 'border-slate-50 shadow-sm hover:border-slate-200'}`}>
+            <span className="text-xs font-black text-blue-400 tracking-[3px] uppercase mb-4 block">Básico</span>
+            <div className="text-5xl font-black text-[#1E293B] mb-10 tracking-tighter">Grátis</div>
+            <ul className="flex flex-col gap-5 mb-10 flex-1">
+               <PlanLi text="3 análises por mês" active />
+               <PlanLi text="IA Gemini 2.5 Flash" active />
+               <PlanLi text="Sem histórico salvo" danger />
+               <PlanLi text="Suporte Comunitário" active />
+            </ul>
+            {profile?.plan_tier === 'free' && (
+              <div className="bg-blue-50 text-blue-500 py-4 rounded-[20px] font-black text-center border border-blue-100 uppercase tracking-widest text-[11px] mt-auto">Seu Plano Atual</div>
+            )}
+         </div>
+
+         <div className="p-10 rounded-[48px] border-2 border-[#22C55E] bg-[#1E293B] text-white shadow-2xl shadow-green-200/20 relative flex flex-col h-full md:scale-[1.05] animate-pulse-subtle z-10">
+            <div className="absolute -top-4 -right-2 bg-[#22C55E] text-white px-6 py-2.5 rounded-full text-[11px] font-black uppercase tracking-[2px] shadow-xl">MELHOR VALOR</div>
+            <span className="text-xs font-black text-green-500 tracking-[3px] uppercase mb-4 block">Premium</span>
+            <div className="flex items-baseline gap-2 mb-10">
+               <span className="text-5xl font-black tracking-tighter">R$ 19,90</span>
+               <span className="text-slate-400 font-bold text-lg">/mês</span>
+            </div>
+            <ul className="flex flex-col gap-5 mb-12 flex-1">
+               <PlanLi text="Análises Ilimitadas" active light />
+               <PlanLi text="Histórico Vitalício" active light />
+               <PlanLi text="Chat Contextual IA" active light />
+               <PlanLi text="Prioridade de Resposta" active light />
+               <PlanLi text="Resumos Avançados" active light />
+            </ul>
+            {profile?.plan_tier !== 'premium' ? (
+              <button onClick={onSelect} className="w-full bg-[#22C55E] text-white py-6 rounded-[28px] font-black flex items-center justify-center gap-3 shadow-2xl shadow-green-500/20 active:scale-95 hover:bg-green-400 transition-all mt-auto">ASSINAR PREMIUM <Zap className="w-5 h-5 fill-white"/></button>
+            ) : (
+              <div className="bg-green-500/20 text-green-500 py-4 rounded-[20px] font-black text-center border border-green-500/30 uppercase tracking-widest text-[11px] mt-auto">Você já é Premium!</div>
+            )}
+         </div>
+      </div>
+    </div>
+  );
+}
+
+function ScreenPagamento({ onBack, onConfirm }: any) {
+  const [payLoading, setPayLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('pix');
+  const [cardData, setCardData] = useState({ number: '', name: '', expiry: '', cvv: '' });
+  const [error, setError] = useState('');
+
+  const handlePay = () => {
+    if (paymentMethod === 'card') {
+      if (!cardData.number || !cardData.name || !cardData.expiry || !cardData.cvv) {
+        setError('Preencha todos os dados do cartão.');
+        return;
+      }
+    }
+    setError('');
+    setPayLoading(true);
+    setTimeout(onConfirm, 2000); // Simulando o tempo da API
+  };
+
+  return (
+    <div className="flex flex-col gap-10 h-full bg-white p-6 md:p-12 rounded-[40px] shadow-sm min-h-[80vh]">
+      <div className="flex items-center gap-4">
+        <button onClick={onBack} className="p-3 bg-slate-50 hover:bg-slate-100 rounded-2xl transition-colors"><ArrowLeft className="text-slate-400" /></button>
+        <div className="flex flex-col">
+          <h2 className="text-2xl font-black text-[#1E293B]">Pagamento</h2>
+          <p className="text-xs font-bold text-slate-300 uppercase tracking-widest">Sua segurança em 1º lugar</p>
+        </div>
+      </div>
+
+      <div className="bg-white p-8 md:p-12 rounded-[40px] border border-slate-100 shadow-xl flex flex-col gap-10 max-w-2xl mx-auto w-full mt-4">
+         <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-1">
+               <span className="text-sm font-black text-slate-300 uppercase">Total a pagar</span>
+               <span className="text-4xl md:text-5xl font-black text-[#1E293B]">R$ 19,90</span>
+            </div>
+            <div className="w-16 h-16 md:w-20 md:h-20 bg-green-50 rounded-3xl flex items-center justify-center"><CreditCard className="text-green-500 w-8 h-8 md:w-10 md:h-10" /></div>
+         </div>
+
+         <div className="flex flex-col gap-4">
+            <div className="bg-slate-50 p-6 rounded-3xl flex items-center gap-5 border border-slate-100 border-dashed">
+               <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm shrink-0"><Zap className="text-orange-400 fill-orange-400 w-6 h-6" /></div>
+               <div className="flex flex-col">
+                  <span className="text-sm md:text-base font-black text-[#1E293B]">Acesso Premium Vitalício</span>
+                  <span className="text-xs md:text-sm font-bold text-slate-400">Ativação imediata após confirmação</span>
+               </div>
+            </div>
+         </div>
+
+         <div className="flex flex-col gap-4">
+            <span className="text-xs font-black text-slate-300 uppercase px-1 tracking-widest">Método de Checkout</span>
+            <div className="grid grid-cols-2 gap-4">
+               <CheckoutOption icon={QrCode} label="PIX" active={paymentMethod === 'pix'} onClick={() => setPaymentMethod('pix')} />
+               <CheckoutOption icon={CreditCard} label="Cartão" active={paymentMethod === 'card'} onClick={() => setPaymentMethod('card')} />
+            </div>
+         </div>
+
+         {error && <div className="text-red-500 text-sm font-bold text-center px-4 py-3 bg-red-50 rounded-2xl">{error}</div>}
+
+         {paymentMethod === 'pix' ? (
+            <div className="flex flex-col items-center gap-6 bg-slate-50 p-8 rounded-3xl border border-slate-100 border-dashed">
+               <div className="p-4 bg-white rounded-2xl shadow-sm border border-slate-100">
+                  <QrCode className="w-32 h-32 md:w-48 md:h-48 text-slate-800" />
+               </div>
+               <p className="text-sm font-bold text-slate-400 text-center px-4 leading-relaxed max-w-sm">
+                  Para fins do teste: não é necessário ler este QR code. Apenas pressione o botão abaixo para simular um pagamento bem sucedido.
+               </p>
+               <button onClick={handlePay} className="w-full max-w-sm bg-[#1E293B] text-white py-5 rounded-[24px] font-black shadow-2xl flex items-center justify-center gap-4 hover:bg-black transition-all">
+                  {payLoading ? <Loader2 className="animate-spin" /> : <>SIMULAR PIX <ChevronRight/></>}
+               </button>
+            </div>
+         ) : (
+            <div className="flex flex-col gap-4">
+               <input type="text" placeholder="Número do Cartão" value={cardData.number} onChange={e => setCardData({...cardData, number: e.target.value})} className="w-full bg-slate-50 border-2 border-transparent px-6 py-5 rounded-[20px] font-bold text-[#1E293B] focus:bg-white focus:border-green-500/20 active:outline-none focus:outline-none transition-all placeholder:text-slate-300 shadow-inner" />
+               <input type="text" placeholder="Nome Impresso no Cartão" value={cardData.name} onChange={e => setCardData({...cardData, name: e.target.value})} className="w-full bg-slate-50 border-2 border-transparent px-6 py-5 rounded-[20px] font-bold text-[#1E293B] focus:bg-white focus:border-green-500/20 active:outline-none focus:outline-none transition-all placeholder:text-slate-300 shadow-inner" />
+               <div className="grid grid-cols-2 gap-4">
+                  <input type="text" placeholder="Validade (MM/YY)" value={cardData.expiry} onChange={e => setCardData({...cardData, expiry: e.target.value})} className="w-full bg-slate-50 border-2 border-transparent px-6 py-5 rounded-[20px] font-bold text-[#1E293B] focus:bg-white focus:border-green-500/20 active:outline-none focus:outline-none transition-all placeholder:text-slate-300 shadow-inner" />
+                  <input type="text" placeholder="CVV" value={cardData.cvv} onChange={e => setCardData({...cardData, cvv: e.target.value})} className="w-full bg-slate-50 border-2 border-transparent px-6 py-5 rounded-[20px] font-bold text-[#1E293B] focus:bg-white focus:border-green-500/20 active:outline-none focus:outline-none transition-all placeholder:text-slate-300 shadow-inner" />
+               </div>
+               <button onClick={handlePay} className="w-full bg-[#1E293B] text-white py-6 md:py-7 rounded-[32px] font-black shadow-2xl flex items-center justify-center gap-4 hover:bg-black transition-all mt-4 hover:shadow-green-900/20">
+                  {payLoading ? <Loader2 className="animate-spin" /> : <>PAGAR AGORA (Simulação) <ChevronRight/></>}
+               </button>
+            </div>
+         )}
+      </div>
+
+      <div className="flex items-center justify-center gap-3 text-slate-300 mt-auto pt-8">
+         <ShieldCheck className="w-5 h-5 text-green-500" />
+         <span className="text-[10px] md:text-xs font-bold uppercase tracking-[2px]">Pagamento 100% Seguro e Criptografado</span>
+      </div>
+    </div>
+  );
+}
+
+function ScreenExplicacoes({ analysis, messages, setMessages, input, setInput, chatLoading, setChatLoading, chatEndRef, onBack }: any) {
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || chatLoading) return;
+    const msg = input.trim();
+    setInput('');
+    setMessages((prev: any) => [...prev, { role: 'user', content: msg }]);
+    setChatLoading(true);
+    try {
+      const response = await askQuestion(analysis, msg);
+      setMessages((prev: any) => [...prev, { role: 'assistant', content: response || "Não entendi..." }]);
+    } catch (e) { console.error(e); }
+    finally { setChatLoading(false); }
+  };
+
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  return (
+    <div className="flex flex-col lg:flex-row h-[85vh] gap-8 bg-white p-6 md:p-8 rounded-[40px] shadow-sm">
+      <div className="flex flex-col gap-6 flex-1 h-full lg:border-r lg:border-slate-100 lg:pr-8">
+        <div className="flex items-center gap-4 shrink-0">
+          <button onClick={onBack} className="p-3 bg-slate-50 hover:bg-slate-100 rounded-2xl transition-colors"><ArrowLeft className="text-slate-400" /></button>
+          <div className="flex flex-col"><h2 className="text-2xl font-black text-[#1E293B]">Análise</h2><p className="text-[10px] font-black text-green-500 uppercase tracking-widest">Documento Processado</p></div>
+        </div>
+        <div className="flex-1 overflow-y-auto bg-slate-50 border border-slate-100 p-8 rounded-[32px] shadow-inner custom-scrollbar markdown-content">
+            <Markdown>{analysis}</Markdown>
+        </div>
+      </div>
+      
+      <div className="lg:w-[400px] shrink-0 bg-[#1E293B] p-6 lg:p-8 rounded-[32px] lg:rounded-[40px] flex flex-col gap-6 max-h-[50vh] lg:max-h-full shadow-2xl relative overflow-hidden">
+         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 to-blue-500 opacity-30"></div>
+         <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-4 h-4 text-green-400" />
+            </div>
+            <span className="font-black text-white text-sm">Gênio Explicador</span>
+         </div>
+         <div className="flex-1 overflow-y-auto flex flex-col gap-5 custom-scrollbar pb-2 pr-2">
+            {messages.length === 0 && <div className="text-slate-400 font-bold text-center py-4 text-xs mt-auto mb-auto">Alguma dúvida sobre o texto ao lado? Pergunte aqui!</div>}
+            {messages.map((m: any, i: number) => (
+              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                 <div className={`max-w-[85%] p-4 lg:p-5 rounded-3xl text-[13px] leading-relaxed font-bold shadow-sm inline-block ${m.role === 'user' ? 'bg-[#22C55E] text-white rounded-br-sm' : 'bg-white/5 text-slate-300 rounded-bl-sm border border-white/5'}`}>{m.content}</div>
+              </div>
+            ))}
+            {chatLoading && <div className="text-green-500 text-[10px] font-black animate-pulse flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin"/> LENDO DOCUMENTO...</div>}
+            <div ref={chatEndRef} />
+         </div>
+         <form onSubmit={handleSendMessage} className="relative group transition-all shrink-0">
+            <input value={input} onChange={e => setInput(e.target.value)} type="text" placeholder="Faça uma pergunta..." className="w-full bg-white/5 border border-white/10 px-6 py-4 rounded-[20px] text-[14px] font-bold text-white shadow-inner outline-none focus:border-green-500/50 focus:bg-white/10 transition-colors" />
+            <button type="submit" className="absolute right-2 top-2 p-2.5 bg-[#22C55E] hover:bg-green-400 rounded-xl text-white shadow-xl active:scale-95 transition-all"><Send className="w-4 h-4" /></button>
+         </form>
+      </div>
+    </div>
+  );
+}
+
+// --- Atomic components ---
+
+function NavItem({ icon: Icon, label, active, onClick }: any) {
+  return (
+    <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'text-[#22C55E]' : 'text-[#94A3B8]'}`}>
+       <motion.div whileTap={{ scale: 0.9 }} className={`p-2.5 rounded-2xl transition-all ${active ? 'bg-green-50 shadow-sm' : ''}`}><Icon className="w-7 h-7" /></motion.div>
+       <span className="text-[9px] font-black tracking-[1.5px] uppercase">{label}</span>
+    </div>
+  );
+}
+
+function AuthInput({ icon: Icon, placeholder, value }: any) {
+  return (
+    <div className="relative group">
+       <Icon className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 w-5 h-5 group-focus-within:text-green-500 transition-colors" />
+       <input type="text" placeholder={placeholder} defaultValue={value} className="w-full bg-slate-50 border-2 border-transparent px-14 py-6 rounded-[24px] font-bold text-[#1E293B] focus:bg-white focus:border-green-500/20 active:outline-none focus:outline-none transition-all placeholder:text-slate-300" />
+    </div>
+  );
+}
+
+function QuickAction({ icon: Icon, label, sub }: any) {
+  return (
+    <div className="bg-white p-7 rounded-[40px] border border-slate-50 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer flex flex-col gap-6">
+       <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center"><Icon className="text-white w-6 h-6" /></div>
+       <div>
+          <span className="text-lg font-black text-[#1E293B] block leading-tight">{label}</span>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-tighter">{sub}</span>
        </div>
     </div>
   );
 }
 
-function GoalItem({ icon: Icon, title, percent, progress }: any) {
+function PlanLi({ text, active, light, danger }: any) {
   return (
-    <div>
-       <div className="flex items-center gap-2 mb-2">
-         <Icon className="w-4 h-4 text-slate-400" />
-         <span className="text-[13px] font-medium text-slate-700">{title}</span>
-         <span className="ml-auto text-[13px] font-bold text-slate-800">{percent}</span>
+    <li className="flex items-center gap-4">
+       <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${danger ? 'bg-red-50 text-red-400' : light ? 'bg-green-500/20 text-green-500' : 'bg-green-50 text-green-600'}`}>
+          {danger ? <X className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
        </div>
-       <div className="w-full h-1.5 bg-slate-100 rounded-full flex overflow-hidden">
-         <div className="h-full bg-[#A2DA27] rounded-full" style={{ width: progress }}></div>
-       </div>
+       <span className={`text-[15px] font-bold ${light ? 'text-slate-300' : 'text-[#334155]'}`}>{text}</span>
+    </li>
+  );
+}
+
+function CheckoutOption({ icon: Icon, label, active, onClick }: any) {
+  return (
+    <div onClick={onClick} className={`p-5 rounded-3xl border-2 flex flex-col items-center gap-3 cursor-pointer transition-all ${active ? 'border-green-500 bg-green-50/20' : 'border-slate-50 bg-white hover:border-slate-100'}`}>
+       <Icon className={active ? 'text-green-600' : 'text-slate-300'} />
+       <span className={`text-[10px] font-black uppercase tracking-widest ${active ? 'text-green-700' : 'text-slate-400'}`}>{label}</span>
     </div>
   );
 }

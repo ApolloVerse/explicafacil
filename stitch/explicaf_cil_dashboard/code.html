@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+
+<html lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ExplicaFácil - Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "primary": "#00c721",
+                "background-light": "#f5f8f6",
+                "background-dark": "#0f2312",
+              },
+              fontFamily: {
+                "display": ["Inter", "sans-serif"]
+              },
+              borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+            },
+          },
+        }
+      </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
+<nav class="sticky top-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-primary/10 px-6 py-4 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-10 h-10 bg-primary rounded flex items-center justify-center">
+<span class="material-icons-round text-white">school</span>
+</div>
+<span class="font-bold text-xl tracking-tight">Explica<span class="text-primary">Fácil</span></span>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-primary/10 text-slate-600 dark:text-slate-400">
+<span class="material-icons-round">notifications</span>
+</button>
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary">
+<img class="w-full h-full object-cover" data-alt="User profile picture of a young man" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDa194nVkPQgROcURDEbuPtTgSdrpzCEI0pAgUIwi6T14uWiM_lIsJ2wKHJ5DqTRCdYENpxb8zDY-ehI34c9k0Ssi4cJhN_SJsRcmNyr6HaGxc72mXTp9b5HcxkRLRI0lLyu02r2x_nI7G7HabbQUezaqYyewJ2zI1Z9CVVLXg7B_d6kCfku5iaRifVsyrAQJdPKgmRYt4xr5FI2qWZ0Wg9fpsgcjM6zHCNpcLltLkkpwcJWKwcT94COvQfVG7IkLKBiKkYdhtgZA4"/>
+</div>
+</div>
+</nav>
+<main class="max-w-7xl mx-auto p-6 md:p-8 space-y-8">
+<header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div>
+<h1 class="text-3xl md:text-4xl font-bold">Bem-vindo, Daniel! 👋</h1>
+<p class="text-slate-500 dark:text-slate-400 mt-1">Aqui está o que está acontecendo com seus projetos hoje.</p>
+</div>
+<button class="bg-primary text-white px-6 py-3 rounded-full font-semibold flex items-center gap-2 hover:opacity-90 transition-opacity self-start">
+<span class="material-icons-round">add</span>
+                Nova Tarefa
+            </button>
+</header>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<div class="bg-white dark:bg-slate-900 p-6 rounded-lg shadow-sm border border-primary/5 flex items-center justify-between">
+<div class="space-y-2">
+<p class="text-slate-500 dark:text-slate-400 font-medium">Reuniões</p>
+<p class="text-3xl font-bold">12 <span class="text-sm font-normal text-slate-400">esta semana</span></p>
+<div class="flex items-center gap-1 text-primary text-sm font-medium">
+<span class="material-icons-round text-sm">trending_up</span>
+<span>+15% vs última semana</span>
+</div>
+</div>
+<div class="relative w-20 h-20">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-primary/10" cx="40" cy="40" fill="transparent" r="34" stroke="currentColor" stroke-width="8"></circle>
+<circle class="text-primary" cx="40" cy="40" fill="transparent" r="34" stroke="currentColor" stroke-dasharray="213.6" stroke-dashoffset="64" stroke-width="8"></circle>
+</svg>
+<div class="absolute inset-0 flex items-center justify-center font-bold text-primary">70%</div>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-lg shadow-sm border border-primary/5 space-y-4">
+<div class="flex justify-between items-center">
+<p class="text-slate-500 dark:text-slate-400 font-medium">Tarefas concluídas</p>
+<span class="material-icons-round text-primary">task_alt</span>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-sm">
+<span class="font-bold">24/30</span>
+<span class="text-slate-500">80%</span>
+</div>
+<div class="w-full bg-primary/10 h-3 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full w-[80%]"></div>
+</div>
+</div>
+<p class="text-xs text-slate-400 italic">Quase lá! Faltam apenas 6 tarefas para sua meta.</p>
+</div>
+<div class="bg-primary dark:bg-primary/20 p-6 rounded-lg shadow-sm border border-primary/10 text-white dark:text-slate-100 flex flex-col justify-between">
+<div>
+<h3 class="font-bold text-lg">Plano Premium</h3>
+<p class="text-white/80 dark:text-slate-400 text-sm">Sua assinatura expira em 15 dias.</p>
+</div>
+<button class="mt-4 bg-white dark:bg-primary text-primary dark:text-white px-4 py-2 rounded font-bold text-sm">Renovar Agora</button>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<div class="lg:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-lg shadow-sm border border-primary/5">
+<div class="flex justify-between items-center mb-8">
+<h3 class="font-bold text-xl">Progresso Semanal</h3>
+<select class="bg-background-light dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-primary">
+<option>Últimos 7 dias</option>
+<option>Últimos 30 dias</option>
+</select>
+</div>
+<div class="flex items-end justify-between h-64 gap-2 pt-4">
+<div class="flex flex-col items-center gap-2 flex-1 group">
+<div class="w-full bg-primary/10 rounded-t-lg h-[40%] group-hover:bg-primary/20 transition-colors"></div>
+<span class="text-xs text-slate-500">Seg</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1 group">
+<div class="w-full bg-primary/10 rounded-t-lg h-[65%] group-hover:bg-primary/20 transition-colors"></div>
+<span class="text-xs text-slate-500">Ter</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1 group">
+<div class="w-full bg-primary rounded-t-lg h-[85%]"></div>
+<span class="text-xs font-bold text-primary">Qua</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1 group">
+<div class="w-full bg-primary/10 rounded-t-lg h-[50%] group-hover:bg-primary/20 transition-colors"></div>
+<span class="text-xs text-slate-500">Qui</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1 group">
+<div class="w-full bg-primary/10 rounded-t-lg h-[75%] group-hover:bg-primary/20 transition-colors"></div>
+<span class="text-xs text-slate-500">Sex</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1 group">
+<div class="w-full bg-primary/10 rounded-t-lg h-[30%] group-hover:bg-primary/20 transition-colors"></div>
+<span class="text-xs text-slate-500">Sab</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1 group">
+<div class="w-full bg-primary/10 rounded-t-lg h-[20%] group-hover:bg-primary/20 transition-colors"></div>
+<span class="text-xs text-slate-500">Dom</span>
+</div>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 p-8 rounded-lg shadow-sm border border-primary/5 flex flex-col">
+<h3 class="font-bold text-xl mb-6">Seu time</h3>
+<div class="space-y-6 flex-1">
+<div class="flex items-center gap-4">
+<img class="w-12 h-12 rounded-full border-2 border-primary/20" data-alt="Female team member profile" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCTZ7sVQHnVrV9nvusZkaIIVVVhTU66bGGxd978_YyqUGDnLahIKHzVd84AnEwQSAbGI3xDUTcBa_h4q-_h0LJchpDR_TGJWlCfaLdZ6huS8IfUvs8BlvJrQm4sklMRNKCsQTW0q0blnnfcUBUfGwloGX7xPPOCRHZZMdql2lb6TvcA0hPLwQGNXjLQ8PpK6NU4dvexIMC8HHZFpYpwzLGUmK-a82j8Tg2WXg-EJSLzdyxzCF2oS-PokjEXNFMUnEMbrn3odsuhIvo"/>
+<div class="flex-1">
+<p class="font-bold">Ana Silva</p>
+<p class="text-xs text-slate-500">Designer UI/UX</p>
+</div>
+<span class="w-3 h-3 bg-primary rounded-full"></span>
+</div>
+<div class="flex items-center gap-4">
+<img class="w-12 h-12 rounded-full border-2 border-primary/20" data-alt="Male team member profile" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA_jGssgkCwjXP5_99SOOPPIRxa4LFLtFxvxWSLdTK2DTgAM5ErXWYwdBPq_Dfg8pHR1zHnby7UFNIT-U_XUKNKF_vp-FhgVfZyXkhqRem-Pu9fpa0SfH7xwU-vdoi7_x_4g-AwbnfKbLpxQXOKMh1_rJ6w_su7jywmHV2N6LJ0viPXWumVy1DO3HYuCfUPHQQC1HRL1LPzgqiZnT9qWVhz6K3YbIs4lXpogIISZYe-COvGbOjNaLm10uB9zlpp7huemEe881qU-dk"/>
+<div class="flex-1">
+<p class="font-bold">Marcos Oliveira</p>
+<p class="text-xs text-slate-500">Dev Fullstack</p>
+</div>
+<span class="w-3 h-3 bg-slate-300 rounded-full"></span>
+</div>
+<div class="flex items-center gap-4">
+<img class="w-12 h-12 rounded-full border-2 border-primary/20" data-alt="Female team member profile" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_T1WSD1NhuhLXzTr04AY7JaDQsl02juPQuCv8kgzsPq7FO_YJ8olLsE0xt1vBU1YnJIj4MjhYWfvuF-4jdkZuIS9bxpeNXQRc8bpXE-2f65BhxpBejjw2plZMVCzY0Oj-HF3Kc9iqa3acwxtaxoY7FCqYHAzDpi4G688_pNE1JdI5KbrcUiD78omkdvXRetHWWl7ZJVl8cu8lO0nDlL0JuwH1gMKMpKHI1TNOQLPB_4HN2fY14NAIigOsmufJkhTD94OQ-BqHbDk"/>
+<div class="flex-1">
+<p class="font-bold">Beatriz Costa</p>
+<p class="text-xs text-slate-500">Product Manager</p>
+</div>
+<span class="w-3 h-3 bg-primary rounded-full"></span>
+</div>
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-icons-round">add</span>
+</div>
+<p class="text-sm font-medium text-primary">Convidar novo membro</p>
+</div>
+</div>
+</div>
+</div>
+<section class="bg-white dark:bg-slate-900 rounded-lg p-6 shadow-sm border border-primary/5">
+<h3 class="font-bold text-xl mb-6">Próximas Atividades</h3>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="text-slate-500 text-sm border-b border-primary/10">
+<th class="pb-4 font-medium">Atividade</th>
+<th class="pb-4 font-medium">Prioridade</th>
+<th class="pb-4 font-medium">Data</th>
+<th class="pb-4 font-medium">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-primary/5">
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="py-4 font-medium">Revisão de Protótipo</td>
+<td class="py-4"><span class="px-3 py-1 bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded-full text-xs font-bold">Alta</span></td>
+<td class="py-4 text-sm">Hoje, 14:00</td>
+<td class="py-4"><span class="text-primary font-medium text-sm italic">Em andamento</span></td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="py-4 font-medium">Daily Scrum</td>
+<td class="py-4"><span class="px-3 py-1 bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 rounded-full text-xs font-bold">Média</span></td>
+<td class="py-4 text-sm">Amanhã, 09:30</td>
+<td class="py-4"><span class="text-slate-400 text-sm">Agendado</span></td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="py-4 font-medium">Ajuste de Backend API</td>
+<td class="py-4"><span class="px-3 py-1 bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded-full text-xs font-bold">Alta</span></td>
+<td class="py-4 text-sm">25 Out, 11:00</td>
+<td class="py-4"><span class="text-slate-400 text-sm">Pendente</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</main>
+<footer class="mt-12 py-8 border-t border-primary/10 text-center text-slate-500 dark:text-slate-400 text-sm">
+<p>© 2023 ExplicaFácil Dashboard. Todos os direitos reservados.</p>
+</footer>
+</body></html>

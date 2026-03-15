@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+
+<html lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#00c721",
+                        "background-light": "#f5f8f6",
+                        "background-dark": "#0f2312",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .active-icon {
+            font-variation-settings: 'FILL' 1;
+        }
+        input[type="checkbox"]:checked {
+            background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
+<div class="max-w-md mx-auto bg-background-light dark:bg-background-dark min-h-screen flex flex-col shadow-xl">
+<!-- Header -->
+<header class="flex items-center justify-between px-6 py-4 sticky top-0 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md z-10">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-3xl">menu</span>
+</div>
+<h1 class="text-xl font-bold tracking-tight">ExplicaFácil</h1>
+<button class="relative p-2 rounded-full hover:bg-primary/10 transition-colors">
+<span class="material-symbols-outlined text-slate-700 dark:text-slate-300">notifications</span>
+<span class="absolute top-2 right-2 flex h-2 w-2 rounded-full bg-primary"></span>
+</button>
+</header>
+<main class="flex-1 overflow-y-auto px-6 pb-24">
+<!-- Welcome Section -->
+<section class="mt-4 mb-8">
+<h2 class="text-2xl font-bold">Rastreador de Tarefas</h2>
+<p class="text-slate-500 dark:text-slate-400 text-sm">Gerencie seu progresso diário</p>
+</section>
+<!-- Filters -->
+<div class="flex gap-2 mb-6 overflow-x-auto pb-2 no-scrollbar">
+<button class="px-5 py-2 rounded-full bg-primary text-white text-sm font-semibold whitespace-nowrap">Todos</button>
+<button class="px-5 py-2 rounded-full bg-primary/10 text-primary dark:text-primary/90 text-sm font-medium whitespace-nowrap">Incompletos</button>
+<button class="px-5 py-2 rounded-full bg-primary/10 text-primary dark:text-primary/90 text-sm font-medium whitespace-nowrap">Concluídos</button>
+</div>
+<!-- Task List -->
+<div class="space-y-4 mb-10">
+<!-- Task Item 1 -->
+<div class="flex items-start gap-4 p-4 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 shadow-sm transition-all">
+<div class="pt-1">
+<input class="h-6 w-6 rounded-md border-primary text-primary focus:ring-primary focus:ring-offset-0 bg-transparent cursor-pointer" type="checkbox"/>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<p class="font-semibold text-base">Revisar documentos de onboarding</p>
+<span class="material-symbols-outlined text-primary text-sm">fiber_manual_record</span>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-xs mb-3">Até amanhã • RH</p>
+<div class="flex flex-wrap gap-2">
+<span class="px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 text-[10px] font-bold uppercase tracking-wider">Faça isso primeiro</span>
+</div>
+</div>
+</div>
+<!-- Task Item 2 -->
+<div class="flex items-start gap-4 p-4 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 shadow-sm transition-all">
+<div class="pt-1">
+<input checked="" class="h-6 w-6 rounded-md border-primary text-primary focus:ring-primary focus:ring-offset-0 bg-transparent cursor-pointer" type="checkbox"/>
+</div>
+<div class="flex-1 opacity-60">
+<div class="flex justify-between items-start">
+<p class="font-semibold text-base line-through">Configurar estação de trabalho</p>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-xs mb-3">Concluído hoje</p>
+<div class="flex flex-wrap gap-2">
+<span class="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 text-[10px] font-bold uppercase tracking-wider">TI</span>
+</div>
+</div>
+</div>
+<!-- Task Item 3 -->
+<div class="flex items-start gap-4 p-4 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 shadow-sm transition-all">
+<div class="pt-1">
+<input class="h-6 w-6 rounded-md border-primary text-primary focus:ring-primary focus:ring-offset-0 bg-transparent cursor-pointer" type="checkbox"/>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<p class="font-semibold text-base">Agendar reunião 1:1</p>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-xs mb-3">Em 2 dias • Gestão</p>
+<div class="flex flex-wrap gap-2">
+<span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold uppercase tracking-wider">Em progresso</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Goals Section -->
+<section>
+<h2 class="text-2xl font-bold mb-6">Minhas Metas</h2>
+<div class="space-y-6">
+<!-- Goal 1 -->
+<div>
+<div class="flex justify-between items-end mb-2">
+<p class="font-semibold text-sm">Conhecer o time</p>
+<p class="text-primary font-bold text-sm">80%</p>
+</div>
+<div class="h-3 w-full bg-primary/10 rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 80%"></div>
+</div>
+</div>
+<!-- Goal 2 -->
+<div>
+<div class="flex justify-between items-end mb-2">
+<p class="font-semibold text-sm">Configurar ferramentas</p>
+<p class="text-primary font-bold text-sm">45%</p>
+</div>
+<div class="h-3 w-full bg-primary/10 rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 45%"></div>
+</div>
+</div>
+<!-- Goal 3 -->
+<div>
+<div class="flex justify-between items-end mb-2">
+<p class="font-semibold text-sm">Completar perfil</p>
+<p class="text-primary font-bold text-sm">100%</p>
+</div>
+<div class="h-3 w-full bg-primary/10 rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 100%"></div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation -->
+<nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/80 dark:bg-background-dark/80 backdrop-blur-lg border-t border-slate-100 dark:border-slate-800 px-6 py-3 flex justify-between items-center z-20">
+<a class="flex flex-col items-center gap-1 group" href="#">
+<span class="material-symbols-outlined text-slate-400 dark:text-slate-500 group-hover:text-primary transition-colors">home</span>
+<span class="text-[10px] font-medium text-slate-500 dark:text-slate-400">Início</span>
+</a>
+<a class="flex flex-col items-center gap-1 group" href="#">
+<span class="material-symbols-outlined text-primary active-icon">format_list_bulleted</span>
+<span class="text-[10px] font-bold text-primary">Tarefas</span>
+</a>
+<a class="flex flex-col items-center gap-1 group" href="#">
+<div class="bg-primary p-3 rounded-full -mt-10 shadow-lg shadow-primary/30 border-4 border-background-light dark:border-background-dark">
+<span class="material-symbols-outlined text-white text-2xl">add</span>
+</div>
+<span class="text-[10px] font-medium text-slate-500 dark:text-slate-400">Novo</span>
+</a>
+<a class="flex flex-col items-center gap-1 group" href="#">
+<span class="material-symbols-outlined text-slate-400 dark:text-slate-500 group-hover:text-primary transition-colors">track_changes</span>
+<span class="text-[10px] font-medium text-slate-500 dark:text-slate-400">Metas</span>
+</a>
+<a class="flex flex-col items-center gap-1 group" href="#">
+<span class="material-symbols-outlined text-slate-400 dark:text-slate-500 group-hover:text-primary transition-colors">person</span>
+<span class="text-[10px] font-medium text-slate-500 dark:text-slate-400">Perfil</span>
+</a>
+</nav>
+</div>
+</body></html>
