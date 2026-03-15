@@ -1031,18 +1031,24 @@ function ScreenPagamento({ user, onBack, onConfirm }: any) {
   const [error, setError] = useState('');
   const [pixData, setPixData] = useState<PixPaymentResponse | null>(null);
 
-  // 1. Create PIX on mount
-  useEffect(() => {
-    const initPix = async () => {
-      setPayLoading(true);
+  const initPix = async () => {
+    setPayLoading(true);
+    setError('');
+    try {
       const data = await paymentService.createPixPayment(user.email);
       if (data) {
         setPixData(data);
       } else {
         setError('Não foi possível gerar o PIX. Tente novamente.');
       }
+    } catch (e) {
+      setError('Erro de conexão. Verifique sua internet.');
+    } finally {
       setPayLoading(false);
-    };
+    }
+  };
+
+  useEffect(() => {
     initPix();
   }, []);
 
@@ -1056,7 +1062,7 @@ function ScreenPagamento({ user, onBack, onConfirm }: any) {
           clearInterval(interval);
           onConfirm();
         }
-      }, 5000); // Check every 5s
+      }, 5000); 
     }
     return () => clearInterval(interval);
   }, [pixData]);
@@ -1096,60 +1102,70 @@ function ScreenPagamento({ user, onBack, onConfirm }: any) {
                </div>
             </div>
             <div className="flex flex-col gap-4">
-             <span className="text-xs font-black text-slate-300 uppercase px-1 tracking-widest">Método de Checkout</span>
-             <div className="grid grid-cols-1">
-                <div className="bg-slate-50 border-2 border-green-500/20 p-5 rounded-3xl flex items-center justify-between shadow-sm">
-                   <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm"><QrCode className="text-green-500 w-5 h-5" /></div>
-                      <span className="text-sm font-black text-[#1E293B]">PIX (Padrão)</span>
-                   </div>
-                   <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-sm shadow-green-500/20"><Check className="text-white w-4 h-4" /></div>
-                </div>
-             </div>
-          </div>
+               <span className="text-xs font-black text-slate-300 uppercase px-1 tracking-widest">Método de Checkout</span>
+               <div className="grid grid-cols-1">
+                  <div className="bg-slate-50 border-2 border-green-500/20 p-5 rounded-3xl flex items-center justify-between shadow-sm">
+                     <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm"><QrCode className="text-green-500 w-5 h-5" /></div>
+                        <span className="text-sm font-black text-[#1E293B]">PIX (Padrão)</span>
+                     </div>
+                     <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-sm shadow-green-500/20"><Check className="text-white w-4 h-4" /></div>
+                  </div>
+               </div>
+            </div>
          </div>
 
-         {error && <div className="text-red-500 text-sm font-bold text-center px-4 py-3 bg-red-50 rounded-2xl">{error}</div>}
-
-         
-            <div className="flex flex-col items-center gap-6 bg-slate-50 p-8 rounded-3xl border border-slate-100 border-dashed min-h-[400px] justify-center">
-               {payLoading && !pixData ? (
-                 <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="w-12 h-12 text-slate-300 animate-spin" />
-                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Gerando PIX Dinâmico...</span>
+         <div className="flex flex-col items-center gap-6 bg-slate-50 p-8 rounded-3xl border border-slate-100 border-dashed min-h-[400px] justify-center">
+            {payLoading ? (
+              <div className="flex flex-col items-center gap-4">
+                 <Loader2 className="w-12 h-12 text-slate-300 animate-spin" />
+                 <span className="text-xs font-black text-slate-400 uppercase tracking-widest text-center">Iniciando pagamento seguro...<br/>Aguarde um momento</span>
+              </div>
+            ) : pixData ? (
+              <>
+                 <div className="p-5 bg-white rounded-[32px] shadow-sm border border-slate-100 flex items-center justify-center hover:shadow-md transition-shadow relative">
+                    <QRCodeCanvas value={pixData.qr_code} size={180} level="M" />
                  </div>
-               ) : pixData ? (
-                 <>
-                    <div className="p-5 bg-white rounded-[32px] shadow-sm border border-slate-100 flex items-center justify-center hover:shadow-md transition-shadow relative">
-                       <QRCodeCanvas value={pixData.qr_code} size={180} level="M" />
-                    </div>
-                    <div className="flex flex-col items-center gap-2 w-full max-w-sm">
-                      <p className="text-[13px] font-bold text-slate-400 text-center px-4 leading-relaxed mb-2">
-                         Escaneie o QR Code ou cole o código Pix abaixo no seu app de banco.
-                      </p>
-                      <div className="flex justify-center mt-1 w-full relative group">
-                        <div className="absolute inset-0 bg-green-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <button onClick={handleCopy} className="bg-[#1E293B] w-full text-white text-[13px] tracking-wide font-black uppercase px-6 py-4 rounded-2xl hover:bg-black transition-all flex items-center justify-center gap-3 active:scale-95 shadow-lg border border-slate-700 relative z-10 text-center disabled:opacity-50">
-                          PIX COPIA E COLA 
-                          <span className="w-5 h-5 bg-white/10 rounded-md flex items-center justify-center">
-                            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='13' height='13' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'%3E%3C/path%3E%3C/svg%3E" alt="copy" className="w-3 h-3 invert opacity-80" />
-                          </span>
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-2 mt-4 text-[10px] font-black text-green-700 bg-green-50/80 border border-green-100 px-4 py-2.5 rounded-full uppercase tracking-widest text-center shadow-sm">
-                        <ShieldCheck className="w-4 h-4" /> Beneficiário: Core Build
-                      </div>
-                    </div>
-                    
-                    <div className="w-full max-w-sm flex items-center justify-center gap-3 p-4">
-                      <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Aguardando Confirmação Real...</span>
-                    </div>
-                 </>
-               ) : (
-                 <div className="text-red-400 text-center font-bold px-8">Erro ao carregar dados do pagamento.</div>
-               )}
-            </div>
+                 <div className="flex flex-col items-center gap-2 w-full max-w-sm">
+                   <p className="text-[13px] font-bold text-slate-400 text-center px-4 leading-relaxed mb-2">
+                      Escaneie o QR Code ou cole o código Pix abaixo no seu app de banco.
+                   </p>
+                   <div className="flex justify-center mt-1 w-full relative group">
+                     <div className="absolute inset-0 bg-green-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                     <button onClick={handleCopy} className="bg-[#1E293B] w-full text-white text-[13px] tracking-wide font-black uppercase px-6 py-4 rounded-2xl hover:bg-black transition-all flex items-center justify-center gap-3 active:scale-95 shadow-lg border border-slate-700 relative z-10 text-center disabled:opacity-50">
+                       PIX COPIA E COLA 
+                       <span className="w-5 h-5 bg-white/10 rounded-md flex items-center justify-center">
+                         <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='13' height='13' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'%3E%3C/path%3E%3C/svg%3E" alt="copy" className="w-3 h-3 invert opacity-80" />
+                       </span>
+                     </button>
+                   </div>
+                   <div className="flex items-center gap-2 mt-4 text-[10px] font-black text-green-700 bg-green-50/80 border border-green-100 px-4 py-2.5 rounded-full uppercase tracking-widest text-center shadow-sm">
+                     <ShieldCheck className="w-4 h-4" /> Beneficiário: Core Build
+                   </div>
+                 </div>
+                 <div className="w-full max-w-sm flex items-center justify-center gap-3 p-4">
+                   <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
+                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Aguardando Confirmação Real...</span>
+                 </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-6 p-4">
+                <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center"><AlertCircle className="text-red-400 w-8 h-8" /></div>
+                <div className="flex flex-col gap-2 text-center">
+                  <span className="text-lg font-black text-[#1E293B]">Ops! Ocorreu um erro</span>
+                  <p className="text-sm font-medium text-slate-400 leading-relaxed px-4">Não conseguimos gerar seu código PIX agora por um problema técnico temporário.</p>
+                </div>
+                <button 
+                  onClick={initPix}
+                  className="w-full py-5 bg-[#1E293B] text-white font-black rounded-2xl text-[11px] uppercase tracking-[2px] hover:bg-black transition-all shadow-xl active:scale-95"
+                >
+                  Tentar Novamente
+                </button>
+                {error && <span className="text-[9px] font-bold text-red-300 uppercase tracking-widest opacity-50">{error}</span>}
+              </div>
+            )}
+         </div>
+      </div>
          
       </div>
 
