@@ -37,6 +37,14 @@ const saveLocalHistory = (history: AnalysisItem[]) => localStorage.setItem('expl
 const getLocalProfile = (email: string, name: string = '', phone: string = ''): UserProfile => JSON.parse(localStorage.getItem(`explica_profile_${email}`) || `{"id":"mock-${Date.now()}","name":"${name}","email":"${email}","phone":"${phone}","plan_tier":"free","analysis_count":0,"analysis_limit":3}`);
 const saveLocalProfile = (profile: UserProfile) => localStorage.setItem(`explica_profile_${profile.email}`, JSON.stringify(profile));
 
+const sessionId = (() => {
+  const stored = localStorage.getItem('explica_session_id');
+  if (stored) return stored;
+  const newId = crypto.randomUUID();
+  localStorage.setItem('explica_session_id', newId);
+  return newId;
+})();
+
 export default function App() {
   const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -96,6 +104,26 @@ export default function App() {
           setSession(s);
           await syncUserData(s.user);
           syncedRef.current = true;
+        }
+        if (mounted) setSession(session);
+        if (session?.user) {
+          syncUserData(session.user);
+          
+          // Single Device Login: Monitor session changes
+          supabase
+            .channel('profile_changes')
+            .on('postgres_changes', { 
+              event: 'UPDATE', 
+              schema: 'public', 
+              table: 'profiles', 
+              filter: `id=eq.${session.user.id}` 
+            }, (payload) => {
+              if (payload.new.current_session_id && payload.new.current_session_id !== sessionId) {
+                alert("Sua conta foi acessada em outro dispositivo. Você será deslogado.");
+                handleLogout();
+              }
+            })
+            .subscribe();
         }
       } catch (err) {
         console.warn("[AUTH] Initial session check failed.");
@@ -159,6 +187,11 @@ export default function App() {
 
       if (data) {
         setProfile(data);
+        
+        // Single Device Login: Update current session
+        if (data.current_session_id !== sessionId) {
+          supabase.from('profiles').update({ current_session_id: sessionId }).eq('id', authUser.id).then();
+        }
 
         // Fetch History
         const { data: history } = await supabase
@@ -700,9 +733,19 @@ function ScreenPerfil({ user, profile, onLogout, onUpgrade, onUpdatePhoto, setPr
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [editPhone, setEditPhone] = useState(profile?.phone || '');
+  const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    if (profile?.premium_expires_at) {
+      const expiresAt = new Date(profile.premium_expires_at);
+      const now = new Date();
+      const diff = expiresAt.getTime() - now.getTime();
+      const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+      setDaysRemaining(Math.max(0, days));
+    }
+
     if (profile && !isEditing) {
       setEditName(profile.name || '');
       setEditPhone(profile.phone || '');
@@ -868,8 +911,15 @@ function ScreenPerfil({ user, profile, onLogout, onUpgrade, onUpdatePhoto, setPr
            </div>
 
            {isPremium && profile?.premium_expires_at && (
-             <div className="mt-4 text-[11px] font-black text-amber-600 flex items-center gap-2 bg-amber-50 px-4 py-2.5 rounded-full uppercase tracking-wider">
-               <Star className="w-3.5 h-3.5" /> Expirará em {new Date(profile.premium_expires_at).toLocaleDateString()}
+             <div className="mt-4 flex flex-col gap-2 w-full px-4">
+               <div className="text-[11px] font-black text-amber-600 flex items-center justify-center gap-2 bg-amber-50 px-4 py-2.5 rounded-full uppercase tracking-wider">
+                 <Star className="w-3.5 h-3.5" /> Expirará em {new Date(profile.premium_expires_at).toLocaleDateString()}
+               </div>
+               {daysRemaining !== null && (
+                 <div className="text-[10px] font-bold text-center text-slate-400 uppercase tracking-widest bg-slate-50 py-2 rounded-xl">
+                   Faltam <span className="text-green-600 font-black">{daysRemaining}</span> dias
+                 </div>
+               )}
              </div>
            )}
         </div>
