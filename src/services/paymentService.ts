@@ -1,5 +1,3 @@
-const MP_ACCESS_TOKEN = import.meta.env.VITE_MERCADO_PAGO_ACCESS_TOKEN;
-
 export interface PixPaymentResponse {
   id: number;
   qr_code: string;
@@ -10,21 +8,13 @@ export interface PixPaymentResponse {
 export const paymentService = {
   createPixPayment: async (email: string): Promise<PixPaymentResponse | null> => {
     try {
-      const response = await fetch('https://api.mercadopago.com/v1/payments', {
+      // Calling our backend proxy instead of Mercado Pago directly
+      const response = await fetch('/api/payment?action=create', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${MP_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json',
-          'X-Idempotency-Key': `pix-${Date.now()}-${Math.random()}`
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          transaction_amount: 19.90,
-          description: 'ExplicaFácil - Plano Premium (1 Mês)',
-          payment_method_id: 'pix',
-          payer: {
-            email: email,
-          }
-        })
+        body: JSON.stringify({ email })
       });
 
       const data = await response.json();
@@ -46,11 +36,8 @@ export const paymentService = {
 
   checkPaymentStatus: async (paymentId: number): Promise<string> => {
     try {
-      const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-        headers: {
-          'Authorization': `Bearer ${MP_ACCESS_TOKEN}`
-        }
-      });
+      // Calling our backend proxy
+      const response = await fetch(`/api/payment?action=check&id=${paymentId}`);
       const data = await response.json();
       return data.status || 'pending';
     } catch (error) {

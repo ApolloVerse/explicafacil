@@ -410,9 +410,7 @@ export default function App() {
       {/* Desktop Sidebar (Left) */}
       <aside className="hidden md:flex w-72 bg-white border-r border-slate-200 flex-col h-screen fixed top-0 left-0 z-40">
         <div className="p-8 flex items-center gap-3">
-          <div className="w-12 h-12 bg-[#22C55E] rounded-2xl flex items-center justify-center shadow-lg transform rotate-3">
-            <FileText className="text-white w-6 h-6" />
-          </div>
+          <img src="/logo.png" alt="Logo" className="w-12 h-12 rounded-2xl shadow-lg transform rotate-3" />
           <h1 className="text-2xl font-black text-[#1E293B] tracking-tighter uppercase">ExplicaFácil</h1>
         </div>
 
@@ -455,9 +453,7 @@ export default function App() {
         {/* Mobile Top Bar */}
         <div className="md:hidden bg-white/90 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
            <div className="flex items-center gap-3">
-             <div className="w-10 h-10 bg-[#22C55E] rounded-xl flex items-center justify-center shadow-md transform rotate-3">
-               <FileText className="text-white w-5 h-5" />
-             </div>
+             <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-xl shadow-md transform rotate-3" />
              <h1 className="text-xl font-black text-[#1E293B] tracking-tighter uppercase">ExplicaFácil</h1>
            </div>
            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 bg-slate-50 text-slate-600 rounded-xl">
@@ -546,9 +542,9 @@ function ScreenAuth({ onLoginGoogle }: any) {
             repeat: Infinity,
             ease: "easeInOut" 
           }}
-          className="w-24 h-24 bg-[#22C55E] rounded-[32px] flex items-center justify-center shadow-xl shadow-green-200 mb-8"
+          className="mb-8"
         >
-          <FileText className="text-white w-10 h-10" />
+          <img src="/logo.png" alt="Logo" className="w-24 h-24 rounded-[32px] shadow-xl shadow-green-200" />
         </motion.div>
         <h1 className="text-5xl font-black text-[#1E293B] mb-4 tracking-tighter uppercase">ExplicaFácil</h1>
         <p className="text-slate-400 font-bold mb-12 leading-relaxed text-sm px-4">Simplificando documentos complexos para você com inteligência artificial.</p>
