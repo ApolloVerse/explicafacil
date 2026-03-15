@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { QRCodeCanvas } from 'qrcode.react';
 import { 
   FileText, CheckCircle2, Loader2, Send, X, History, Home as HomeIcon, Upload, Search, Filter, 
   MoreVertical, PlayCircle, Bell, User, Lock, Mail, Github, LogOut, Star, TrendingUp, ChevronRight,
@@ -1002,7 +1003,7 @@ function ScreenPagamento({ onBack, onConfirm }: any) {
             <div className="bg-slate-50 p-6 rounded-3xl flex items-center gap-5 border border-slate-100 border-dashed">
                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm shrink-0"><Zap className="text-orange-400 fill-orange-400 w-6 h-6" /></div>
                <div className="flex flex-col">
-                  <span className="text-sm md:text-base font-black text-[#1E293B]">Acesso Premium Vitalício</span>
+                  <span className="text-sm md:text-base font-black text-[#1E293B]">Acesso Premium</span>
                   <span className="text-xs md:text-sm font-bold text-slate-400">Ativação imediata após confirmação</span>
                </div>
             </div>
@@ -1020,14 +1021,24 @@ function ScreenPagamento({ onBack, onConfirm }: any) {
 
          {paymentMethod === 'pix' ? (
             <div className="flex flex-col items-center gap-6 bg-slate-50 p-8 rounded-3xl border border-slate-100 border-dashed">
-               <div className="p-4 bg-white rounded-2xl shadow-sm border border-slate-100">
-                  <QrCode className="w-32 h-32 md:w-48 md:h-48 text-slate-800" />
+               <div className="p-5 bg-white rounded-[32px] shadow-sm border border-slate-100 flex items-center justify-center hover:shadow-md transition-shadow">
+                  <QRCodeCanvas value="00020126470014br.gov.bcb.pix0125linobotelho2121@gmail.com5204000053039865802BR5909CURTAMAIS6009Sao Paulo610901227-20062230519daqr1635057486071816304A4EB" size={180} level="M" />
                </div>
-               <p className="text-sm font-bold text-slate-400 text-center px-4 leading-relaxed max-w-sm">
-                  Para fins do teste: não é necessário ler este QR code. Apenas pressione o botão abaixo para simular um pagamento bem sucedido.
-               </p>
-               <button onClick={handlePay} className="w-full max-w-sm bg-[#1E293B] text-white py-5 rounded-[24px] font-black shadow-2xl flex items-center justify-center gap-4 hover:bg-black transition-all">
-                  {payLoading ? <Loader2 className="animate-spin" /> : <>SIMULAR PIX <ChevronRight/></>}
+               <div className="flex flex-col items-center gap-2 w-full max-w-sm">
+                 <p className="text-[13px] font-bold text-slate-400 text-center px-4 leading-relaxed">
+                    Escaneie o QR Code ou cole o código Pix abaixo no seu app de banco.
+                 </p>
+                 <div className="flex items-center gap-2 mt-2 w-full bg-white p-2 rounded-2xl border border-slate-200 shadow-sm focus-within:border-green-500 focus-within:ring-2 focus-within:ring-green-500/20 transition-all">
+                   <input type="text" readOnly value="00020126470014br.gov.bcb.pix0125linobotelho2121@gmail.com5204000053039865802BR5909CURTAMAIS6009Sao Paulo610901227-20062230519daqr1635057486071816304A4EB" className="flex-1 bg-transparent text-xs text-slate-400 font-mono px-3 outline-none w-full truncate cursor-text" onClick={e => e.currentTarget.select()} />
+                   <button onClick={() => { navigator.clipboard.writeText("00020126470014br.gov.bcb.pix0125linobotelho2121@gmail.com5204000053039865802BR5909CURTAMAIS6009Sao Paulo610901227-20062230519daqr1635057486071816304A4EB"); alert("Código Copiado!"); }} className="bg-[#1E293B] text-white text-[11px] font-black uppercase px-5 py-3 rounded-xl hover:bg-black transition-colors shrink-0 flex items-center gap-2 active:scale-95 shadow-sm">Copiar</button>
+                 </div>
+                 <div className="flex items-center gap-2 mt-3 text-[10px] font-black text-green-700 bg-green-50/80 border border-green-100 px-4 py-2.5 rounded-full uppercase tracking-widest text-center shadow-sm">
+                   <ShieldCheck className="w-4 h-4" /> Beneficiário: CURTAMAIS
+                 </div>
+               </div>
+
+               <button onClick={handlePay} className="w-full max-w-sm bg-[#22C55E] text-white py-5 rounded-[24px] font-black shadow-xl shadow-green-500/20 flex items-center justify-center gap-4 hover:bg-green-500 hover:-translate-y-0.5 transition-all mt-4 border border-green-400">
+                  {payLoading ? <Loader2 className="animate-spin" /> : <>JÁ REALIZEI O PAGAMENTO <Check className="w-5 h-5"/></>}
                </button>
             </div>
          ) : (
