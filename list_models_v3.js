@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 async function listModels() {
-  const apiKey = "AIzaSyAztcRalUrMmfXpKBecPfLCExuFa5xfFqE";
+  const apiKey = "AIzaSyBoR38Qva2jphHxRMk4pEN9GU-rUkhiq0w";
   const genAI = new GoogleGenerativeAI(apiKey);
   
   try {

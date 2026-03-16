@@ -1,1 +1,16 @@
-{"projectId":"prj_annV96XA2e1t7QUoVH1BQJFHn7Yp","orgId":"team_szhu4XM5dIIPT4UAog7m3Q0j","projectName":"_github_repo"}
+{
+  "projectId": "prj_annV96XA2e1t7QUoVH1BQJFHn7Yp",
+  "orgId": "team_szhu4XM5dIIPT4UAog7m3Q0j",
+  "projectName": "_github_repo",
+  "settings": {
+    "createdAt": 1773463565834,
+    "framework": "vite",
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": null,
+    "outputDirectory": null,
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "24.x"
+  }
+}

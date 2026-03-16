@@ -1,4 +1,4 @@
---- BUSCANDO MODELOS DISPON├ìVEIS ---
+--- BUSCANDO MODELOS DISPONÍVEIS ---
 Modelos encontrados:
 - models/gemini-2.5-flash
 - models/gemini-2.5-pro

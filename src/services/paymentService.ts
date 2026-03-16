@@ -6,13 +6,14 @@ export interface PixPaymentResponse {
 }
 
 export const paymentService = {
-  createPixPayment: async (email: string): Promise<PixPaymentResponse | null> => {
+  createPixPayment: async (email: string, token: string): Promise<PixPaymentResponse | null> => {
     try {
       // Calling our backend proxy instead of Mercado Pago directly
       const response = await fetch('/api/payment?action=create', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ email })
       });
@@ -34,10 +35,14 @@ export const paymentService = {
     }
   },
 
-  checkPaymentStatus: async (paymentId: number): Promise<string> => {
+  checkPaymentStatus: async (paymentId: number, token: string): Promise<string> => {
     try {
       // Calling our backend proxy
-      const response = await fetch(`/api/payment?action=check&id=${paymentId}`);
+      const response = await fetch(`/api/payment?action=check&id=${paymentId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       const data = await response.json();
       return data.status || 'pending';
     } catch (error) {

@@ -1,21 +1,22 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co'
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key'
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabaseConfigured = !!(
-  import.meta.env.VITE_SUPABASE_URL && 
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
+// No logs in production for security hygiene
 
-if (!supabaseConfigured) {
-  console.warn('[SUPABASE] Variáveis de ambiente não configuradas. App rodando em modo offline.')
-}
+export const supabaseConfigured = !!(supabaseUrl && supabaseAnonKey)
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: false,
-    detectSessionInUrl: true
+// Fallback only to avoid total crash, but actual URL should be in Vercel
+
+export const supabase = createClient(
+  supabaseUrl || '', 
+  supabaseAnonKey || '', 
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true, // Switched to true as useSession usually needs this
+      detectSessionInUrl: true
+    }
   }
-})
+)

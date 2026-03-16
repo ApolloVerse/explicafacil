@@ -28,8 +28,10 @@ interface UserProfile {
   analysis_count: number;
   analysis_limit: number;
   premium_expires_at?: string;
+  terms_accepted: boolean;
+  credits: number;
 }
-type TabType = 'inicio' | 'historico' | 'explicações' | 'perfil' | 'planos' | 'pagamento';
+type TabType = 'inicio' | 'historico' | 'explicações' | 'perfil' | 'planos' | 'pagamento' | 'termos' | 'privacidade';
 
 // --- Mock Storage Helpers ---
 const getLocalHistory = (): AnalysisItem[] => JSON.parse(localStorage.getItem('explica_history') || '[]');
@@ -62,6 +64,7 @@ export default function App() {
   const [input, setInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [analysisHistory, setAnalysisHistory] = useState<AnalysisItem[]>([]);
+  const [showTermsModal, setShowTermsModal] = useState(false);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -80,7 +83,7 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       if (!mounted) return;
       
-      console.log(`[AUTH] Event: ${event}`);
+      // Auth status managed Silently
       setSession(newSession);
       
       if (newSession?.user) {
@@ -114,6 +117,10 @@ export default function App() {
 
     initAuth();
 
+    if (!supabaseConfigured) {
+      setError("Configuração do Supabase ausente. Verifique as variáveis de ambiente.");
+    }
+
     const safetyTimer = setTimeout(() => {
       if (mounted && authLoading) {
         setAuthLoading(false);
@@ -131,7 +138,6 @@ export default function App() {
   useEffect(() => {
     if (!profile?.id) return;
 
-    console.log("[SESSION] Starting monitoring for user:", profile.id);
     const channel = supabase
       .channel(`session_sync_${profile.id}`)
       .on('postgres_changes', { 
@@ -141,7 +147,6 @@ export default function App() {
         filter: `id=eq.${profile.id}` 
       }, (payload) => {
         const newSessionId = payload.new.current_session_id;
-        console.log("[SESSION] DB Change detected:", newSessionId, "vs Local:", sessionId);
         
         // Se o novo session_id for diferente do local, e este dispositivo JÁ tinha um session_id salvo
         if (newSessionId && newSessionId !== sessionId) {
@@ -149,12 +154,9 @@ export default function App() {
           handleLogout();
         }
       })
-      .subscribe((status) => {
-        console.log("[SESSION] Subscription status:", status);
-      });
+      .subscribe();
 
     return () => {
-      console.log("[SESSION] Cleaning up monitoring");
       supabase.removeChannel(channel);
     };
   }, [profile?.id]);
@@ -180,8 +182,7 @@ export default function App() {
         }
 
         if (Object.keys(updates).length > 0) {
-          console.log("[SYNC] Permitting upsert with:", updates);
-          const { data: updated, error: upsertError } = await supabase
+          const { data: updated } = await supabase
             .from('profiles')
             .upsert({ id: authUser.id, email: authUser.email, ...updates }, { onConflict: 'id' })
             .select()
@@ -189,10 +190,6 @@ export default function App() {
           
           if (updated) {
             data = updated;
-            console.log("[SYNC] Profile successfully upserted.");
-          }
-          if (upsertError) {
-            console.error("[SYNC] Upsert error (Check RLS for INSERT):", upsertError);
           }
         }
       }
@@ -212,9 +209,14 @@ export default function App() {
           .eq('user_id', authUser.id)
           .order('created_at', { ascending: false });
         if (history) setAnalysisHistory(history);
+
+        // Termos Acceptance check (Problem Z)
+        if (data.terms_accepted === false) {
+           setShowTermsModal(true);
+        }
       }
     } catch (err) {
-      console.error("Sync error:", err);
+      // Background sync errors are silent in prod
     }
   };
 
@@ -265,7 +267,7 @@ export default function App() {
         let firstChunk = true;
 
         try {
-          const stream = analyzeDocumentStream(base64, file.type);
+          const stream = analyzeDocumentStream(base64, file.type, session.access_token);
           
           for await (const chunk of stream) {
             if (firstChunk) {
@@ -303,9 +305,7 @@ export default function App() {
           if (updatedProfile) setProfile(updatedProfile);
 
         } catch (err: any) {
-          console.error("Stream error details:", err);
-          const errorMsg = err.message || "Erro desconhecido";
-          setError(`Erro na conexão com a IA: ${errorMsg}`);
+          setError("Não foi possível completar a análise. Tente novamente mais tarde.");
           setLoading(false);
         }
       };
@@ -412,31 +412,23 @@ export default function App() {
                   setProfile={setProfile}
                 />;
               case 'planos': return <ScreenPlanos profile={profile} onSelect={() => setActiveTab('pagamento')} onBack={() => setActiveTab('inicio')} />;
-              case 'pagamento': return <ScreenPagamento user={session.user} onBack={() => setActiveTab('planos')} onConfirm={async () => {
+              case 'pagamento': return <ScreenPagamento user={session.user} session={session} onBack={() => setActiveTab('planos')} onConfirm={async () => {
                 const expiresAt = new Date();
                 expiresAt.setDate(expiresAt.getDate() + 30);
                 
-                // Security Audit in Supabase
                 await supabase.from('payments').insert({
                   user_id: session.user.id,
                   amount: 19.90,
                   method: 'pix'
                 });
 
-                const { data: updated } = await supabase
-                  .from('profiles')
-                  .update({ 
-                    plan_tier: 'premium', 
-                    premium_expires_at: expiresAt.toISOString() 
-                  })
-                  .eq('id', session.user.id)
-                  .select()
-                  .single();
-
+                const { data: updated } = await supabase.from('profiles').update({ plan_tier: 'premium', premium_expires_at: expiresAt.toISOString() }).eq('id', session.user.id).select().single();
                 if (updated) setProfile(updated);
                 setActiveTab('perfil');
               }} />;
-              case 'explicações': return <ScreenExplicacoes analysis={analysis} messages={messages} setMessages={setMessages} input={input} setInput={setInput} chatLoading={chatLoading} setChatLoading={setChatLoading} chatEndRef={chatEndRef} onBack={() => { setAnalysis(null); setMessages([]); setActiveTab(profile?.plan_tier === 'premium' ? 'historico' : 'inicio'); }} />;
+              case 'explicações': return <ScreenExplicacoes analysis={analysis} session={session} messages={messages} setMessages={setMessages} input={input} setInput={setInput} chatLoading={chatLoading} setChatLoading={setChatLoading} chatEndRef={chatEndRef} onBack={() => { setAnalysis(null); setMessages([]); setActiveTab(profile?.plan_tier === 'premium' ? 'historico' : 'inicio'); }} />;
+              case 'termos': return <ScreenTermos onBack={() => setActiveTab('inicio')} />;
+              case 'privacidade': return <ScreenPrivacidade onBack={() => setActiveTab('inicio')} />;
               default: return <ScreenInicio {...{file, setFile, loading, error, setError, handleAnalyze, profile}} />;
             }
           })()}
@@ -455,7 +447,7 @@ export default function App() {
       {/* Desktop Sidebar (Left) */}
       <aside className="hidden md:flex w-72 bg-white border-r border-slate-200 flex-col h-screen fixed top-0 left-0 z-40">
         <div className="p-8 flex items-center gap-3">
-          <img src="/logo.png" alt="Logo" className="w-12 h-12 rounded-2xl shadow-lg transform rotate-3" />
+          <img src="/logo.png" alt="Logo ExplicaFácil" className="w-12 h-12 rounded-2xl shadow-lg transform rotate-3" />
           <h1 className="text-2xl font-black text-[#1E293B] tracking-tighter uppercase">ExplicaFácil</h1>
         </div>
 
@@ -487,7 +479,7 @@ export default function App() {
               </div>
            </div>
            <div className="mt-4 text-center">
-             <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">v1.2</span>
+             <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">v1.3</span>
            </div>
         </div>
       </aside>
@@ -498,7 +490,7 @@ export default function App() {
         {/* Mobile Top Bar */}
         <div className="md:hidden bg-white/90 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
            <div className="flex items-center gap-3">
-             <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-xl shadow-md transform rotate-3" />
+             <img src="/logo.png" alt="Logo ExplicaFácil" className="w-10 h-10 rounded-xl shadow-md transform rotate-3" />
              <h1 className="text-xl font-black text-[#1E293B] tracking-tighter uppercase">ExplicaFácil</h1>
            </div>
            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 bg-slate-50 text-slate-600 rounded-xl">
@@ -540,7 +532,7 @@ export default function App() {
                   ))}
                 </nav>
                 <div className="p-6 text-center border-t border-slate-50">
-                   <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">v1.2</span>
+                   <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">v1.3</span>
                 </div>
               </motion.div>
             </>
@@ -548,10 +540,21 @@ export default function App() {
         </AnimatePresence>
 
         {/* Dynamic Screen Content Container */}
-        <div className="flex-1 overflow-y-auto w-full custom-scrollbar bg-[#F0F2F5] pb-24 md:pb-8 relative">
-           <div className="max-w-4xl mx-auto w-full p-6 md:p-10 min-h-full">
+        <div className="flex-1 overflow-y-auto w-full custom-scrollbar bg-[#F0F2F5] pb-24 md:pb-8 relative flex flex-col justify-between">
+           <div className="max-w-4xl mx-auto w-full p-6 md:p-10 min-h-[calc(100vh-100px)]">
               {renderScreen()}
            </div>
+           
+           {/* Global Footer (Problem W: Legal Links) */}
+           <footer className="w-full bg-white border-t border-slate-200 py-6 mt-auto">
+             <div className="max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+               <p className="text-sm font-bold text-slate-400">© 2026 ExplicaFácil. Todos os direitos reservados.</p>
+               <div className="flex items-center gap-6">
+                 <button onClick={() => setActiveTab('termos')} className="text-sm font-black text-slate-500 hover:text-green-500 transition-colors">Termos de Uso</button>
+                 <button onClick={() => setActiveTab('privacidade')} className="text-sm font-black text-slate-500 hover:text-green-500 transition-colors">Política de Privacidade</button>
+               </div>
+             </div>
+           </footer>
         </div>
 
 
@@ -561,16 +564,49 @@ export default function App() {
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
         .dash-border { background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='40' ry='40' stroke='%2322C55E' stroke-width='4' stroke-dasharray='16%2c 16' stroke-dashoffset='0' stroke-linecap='round'/%3e%3c/svg%3e"); border-radius: 40px; }
-        .markdown-content h1 { font-size: 1.6rem; font-weight: 900; color: #1E293B; margin: 1.5rem 0 1rem; border-bottom: 2px solid #F1F5F9; padding-bottom: 0.5rem; }
-        .markdown-content h2 { font-size: 1.2rem; font-weight: 800; color: #1E293B; margin: 1.5rem 0 0.75rem; display: flex; items-center; gap: 0.5rem; }
-        .markdown-content h3 { font-size: 1rem; font-weight: 800; color: #475569; margin: 1.25rem 0 0.5rem; }
-        .markdown-content p { color: #475569; margin-bottom: 1rem; line-height: 1.8; font-size: 1rem; font-weight: 500; }
+        .markdown-content h1 { font-size: 1.4rem; font-weight: 900; color: #1E293B; margin: 1rem 0 0.75rem; border-bottom: 2px solid #F1F5F9; padding-bottom: 0.4rem; }
+        .markdown-content h2 { font-size: 1.1rem; font-weight: 800; color: #1E293B; margin: 1.25rem 0 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
+        .markdown-content h3 { font-size: 0.95rem; font-weight: 800; color: #475569; margin: 1rem 0 0.4rem; }
+        .markdown-content p { color: #475569; margin-bottom: 0.75rem; line-height: 1.6; font-size: 0.95rem; font-weight: 500; }
         .markdown-content strong { color: #1E293B; font-weight: 800; }
-        .markdown-content ul, .markdown-content ol { margin-bottom: 1.25rem; padding-left: 1.25rem; }
-        .markdown-content li { margin-bottom: 0.5rem; color: #475569; font-weight: 500; line-height: 1.6; }
-        .markdown-content hr { border: 0; border-top: 2px dashed #E2E8F0; margin: 2rem 0; }
-        .markdown-content blockquote { border-left: 4px solid #22C55E; padding-left: 1rem; font-style: italic; color: #64748B; margin-bottom: 1rem; }
+        .markdown-content ul, .markdown-content ol { margin-bottom: 1rem; padding-left: 1.1rem; }
+        .markdown-content li { margin-bottom: 0.35rem; color: #475569; font-weight: 500; line-height: 1.5; }
+        .markdown-content hr { border: 0; border-top: 2px dashed #E2E8F0; margin: 1.5rem 0; }
+        .markdown-content blockquote { border-left: 4px solid #22C55E; padding: 0.75rem 1rem; font-style: italic; color: #64748B; margin-bottom: 1rem; background: #F8FAFC; border-radius: 0 12px 12px 0; }
       `}</style>
+
+      {/* Terms Acceptance Modal (Problem Z) */}
+      <AnimatePresence>
+        {showTermsModal && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-6">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white p-10 rounded-[48px] shadow-2xl max-w-lg w-full text-center">
+              <div className="w-20 h-20 bg-green-50 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl"><ShieldCheck className="text-green-500 w-10 h-10" /></div>
+              <h2 className="text-3xl font-black text-[#1E293B] mb-4">Bem-vindo(a)!</h2>
+              <p className="text-slate-400 font-bold mb-8 leading-relaxed">
+                Para garantir sua segurança e privacidade, por favor aceite nossos termos e políticas antes de começar.
+              </p>
+              <div className="flex flex-col gap-4">
+                <button 
+                  onClick={async () => {
+                    const { error } = await supabase.from('profiles').update({ terms_accepted: true }).eq('id', profile?.id);
+                    if (!error) {
+                      setProfile((p: any) => ({ ...p, terms_accepted: true }));
+                      setShowTermsModal(false);
+                    }
+                  }} 
+                  className="bg-[#22C55E] text-white py-6 rounded-3xl font-black shadow-xl hover:bg-green-600 transition-colors"
+                >
+                  CONCORDO E QUERO COMEÇAR
+                </button>
+                <div className="flex justify-center gap-6 mt-2">
+                  <button onClick={() => { setShowTermsModal(false); setActiveTab('termos'); }} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-[#22C55E]">Ler Termos</button>
+                  <button onClick={() => { setShowTermsModal(false); setActiveTab('privacidade'); }} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-[#22C55E]">Privacidade</button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -595,7 +631,7 @@ function ScreenAuth({ onLoginGoogle }: any) {
           }}
           className="mb-8"
         >
-          <img src="/logo.png" alt="Logo" className="w-24 h-24 rounded-[32px] shadow-xl shadow-green-200" />
+          <img src="/logo.png" alt="Logotipo do Aplicativo" className="w-24 h-24 rounded-[32px] shadow-xl shadow-green-200" />
         </motion.div>
         <h1 className="text-5xl font-black text-[#1E293B] mb-4 tracking-tighter uppercase">ExplicaFácil</h1>
         <p className="text-slate-400 font-bold mb-12 leading-relaxed text-sm px-4">Simplificando documentos complexos para você com inteligência artificial.</p>
@@ -608,9 +644,13 @@ function ScreenAuth({ onLoginGoogle }: any) {
            </button>
         </div>
         
-        <p className="mt-12 text-[10px] text-slate-300 font-bold leading-loose uppercase tracking-widest">Ao continuar, você concorda com nossos <br/> <span className="text-[#22C55E] cursor-pointer hover:underline">Termos de Uso</span> e <span className="text-[#22C55E] cursor-pointer hover:underline">Privacidade</span></p>
+        <p className="mt-12 text-[10px] text-slate-300 font-bold leading-loose uppercase tracking-widest">
+           Ao continuar, você concorda com nossos <br/> 
+           <a href="/termos" className="text-[#22C55E] hover:underline">Termos de Uso</a> e 
+           <a href="/privacidade" className="text-[#22C55E] hover:underline"> Privacidade</a>
+        </p>
         <div className="mt-4">
-           <span className="text-[10px] font-bold text-slate-200 uppercase tracking-widest">v1.2</span>
+           <span className="text-[10px] font-bold text-slate-200 uppercase tracking-widest">v1.3</span>
         </div>
       </motion.div>
     </div>
@@ -628,7 +668,7 @@ function ScreenInicio({ file, setFile, loading, error, setError, handleAnalyze, 
       <header className="flex justify-between items-center">
         <div className="flex items-center gap-4">
           {profile?.avatar_url ? (
-            <img src={profile.avatar_url} className="w-12 h-12 rounded-full border-2 border-white shadow-sm object-cover" />
+            <img src={profile.avatar_url} alt={`Avatar de ${profile.name || 'usuário'}`} className="w-12 h-12 rounded-full border-2 border-white shadow-sm object-cover" />
           ) : (
             <div className="w-12 h-12 bg-slate-900 rounded-full flex items-center justify-center shadow-lg"><User className="text-white w-6 h-6" /></div>
           )}
@@ -848,10 +888,9 @@ function ScreenPerfil({ user, profile, onLogout, onUpgrade, onUpdatePhoto, setPr
       .single()
       .then(({ data, error }) => {
         if (error) {
-          console.warn("[PROFILE] DB sync failed (RLS?). Data saved locally:", error.message);
+          // Silent failure on background sync
         } else if (data) {
           setProfile(data);
-          console.log("[PROFILE] DB sync successful.");
         }
       });
   };
@@ -874,7 +913,7 @@ function ScreenPerfil({ user, profile, onLogout, onUpgrade, onUpdatePhoto, setPr
            />
            <div onClick={handlePhotoClick} className="w-32 h-32 bg-slate-50 rounded-[40px] flex items-center justify-center mb-8 shadow-inner overflow-hidden border-4 border-white relative cursor-pointer group hover:shadow-md transition-shadow">
               {profile?.avatar_url || previewUrl ? (
-                <img src={previewUrl || profile?.avatar_url} className="w-full h-full object-cover" />
+                <img src={previewUrl || profile?.avatar_url} alt="Sua foto de perfil" className="w-full h-full object-cover" />
               ) : (
                 <User className="w-14 h-14 text-slate-200" />
               )}
@@ -1026,7 +1065,7 @@ function ScreenPlanos({ profile, onSelect, onBack }: any) {
   );
 }
 
-function ScreenPagamento({ user, onBack, onConfirm }: any) {
+function ScreenPagamento({ user, session, onBack, onConfirm }: any) {
   const [payLoading, setPayLoading] = useState(false);
   const [error, setError] = useState('');
   const [pixData, setPixData] = useState<PixPaymentResponse | null>(null);
@@ -1035,7 +1074,7 @@ function ScreenPagamento({ user, onBack, onConfirm }: any) {
     setPayLoading(true);
     setError('');
     try {
-      const data = await paymentService.createPixPayment(user.email);
+      const data = await paymentService.createPixPayment(user.email, session.access_token);
       if (data) {
         setPixData(data);
       } else {
@@ -1054,10 +1093,10 @@ function ScreenPagamento({ user, onBack, onConfirm }: any) {
 
   // 2. Real-time Polling for confirmation
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: any;
     if (pixData && pixData.status !== 'approved') {
       interval = setInterval(async () => {
-        const currentStatus = await paymentService.checkPaymentStatus(pixData.id);
+        const currentStatus = await paymentService.checkPaymentStatus(pixData.id, session.access_token);
         if (currentStatus === 'approved') {
           clearInterval(interval);
           onConfirm();
@@ -1175,16 +1214,16 @@ function ScreenPagamento({ user, onBack, onConfirm }: any) {
   );
 }
 
-function ScreenExplicacoes({ analysis, messages, setMessages, input, setInput, chatLoading, setChatLoading, chatEndRef, onBack }: any) {
+function ScreenExplicacoes({ analysis, session, messages, setMessages, input, setInput, chatLoading, setChatLoading, chatEndRef, onBack }: any) {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || chatLoading) return;
     const msg = input.trim();
-    setInput('');
     setMessages((prev: any) => [...prev, { role: 'user', content: msg }]);
+    setInput('');
     setChatLoading(true);
     try {
-      const response = await askQuestion(analysis, msg);
+      const response = await askQuestion(analysis, msg, session.access_token);
       setMessages((prev: any) => [...prev, { role: 'assistant', content: response || "Não entendi..." }]);
     } catch (e) { console.error(e); }
     finally { setChatLoading(false); }
@@ -1193,45 +1232,97 @@ function ScreenExplicacoes({ analysis, messages, setMessages, input, setInput, c
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   return (
-    <div className="flex flex-col lg:flex-row h-[85vh] gap-8 bg-white p-6 md:p-8 rounded-[40px] shadow-sm">
-      <div className="flex flex-col gap-6 flex-1 h-full lg:border-r lg:border-slate-100 lg:pr-8">
-        <div className="flex items-center gap-4 shrink-0">
-          <button onClick={onBack} className="p-3 bg-slate-50 hover:bg-slate-100 rounded-2xl transition-colors"><ArrowLeft className="text-slate-400" /></button>
-          <div className="flex flex-col"><h2 className="text-2xl font-black text-[#1E293B]">Análise</h2><p className="text-[10px] font-black text-green-500 uppercase tracking-widest">Documento Processado</p></div>
+    <div className="flex flex-col lg:flex-row h-auto lg:h-[85vh] gap-4 md:gap-6 w-full max-w-7xl mx-auto">
+      {/* Document Analysis Column */}
+      <div className="flex flex-col gap-4 flex-1 h-full min-h-[400px] lg:min-h-0">
+        <div className="flex items-center justify-between shrink-0 bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">
+          <div className="flex items-center gap-3">
+            <button onClick={onBack} className="p-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors active:scale-95"><ArrowLeft className="text-slate-400 w-5 h-5" /></button>
+            <div className="flex flex-col">
+              <h2 className="text-lg font-black text-[#1E293B] leading-none mb-1">Análise do Documento</h2>
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                <p className="text-[9px] font-black text-green-500 uppercase tracking-widest">Processado com Sucesso</p>
+              </div>
+            </div>
+          </div>
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-full border border-slate-100">
+             <FileText className="w-3.5 h-3.5 text-slate-400" />
+             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Explicação Digital</span>
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto bg-slate-50 border border-slate-100 p-8 rounded-[32px] shadow-inner custom-scrollbar markdown-content">
+        
+        <div className="flex-1 overflow-y-auto bg-white/40 backdrop-blur-md border border-slate-200 p-5 md:p-8 rounded-[32px] shadow-sm custom-scrollbar markdown-content relative group">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-green-500 rounded-full opacity-0 group-hover:opacity-10 transition-opacity"></div>
             <Markdown>{analysis}</Markdown>
         </div>
       </div>
       
-      <div className="lg:w-[400px] shrink-0 bg-[#1E293B] p-6 lg:p-8 rounded-[32px] lg:rounded-[40px] flex flex-col gap-6 max-h-[50vh] lg:max-h-full shadow-2xl relative overflow-hidden">
-         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 to-blue-500 opacity-30"></div>
-         <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-4 h-4 text-green-400" />
+      {/* Chat Column */}
+      <div className="lg:w-[380px] shrink-0 bg-[#0F172A] p-5 md:p-6 rounded-[32px] md:rounded-[40px] flex flex-col gap-4 h-[500px] lg:h-full shadow-2xl relative overflow-hidden border border-slate-800">
+         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 via-blue-500 to-green-500 opacity-20"></div>
+         
+         <div className="flex items-center justify-between shrink-0 bg-white/5 p-3 rounded-2xl border border-white/5">
+            <div className="flex items-center gap-2.5">
+               <div className="w-7 h-7 rounded-lg bg-green-500/10 flex items-center justify-center">
+                 <ShieldCheck className="w-3.5 h-3.5 text-green-400" />
+               </div>
+               <span className="font-black text-white text-[13px] uppercase tracking-wider">Perguntar ao Gênio</span>
             </div>
-            <span className="font-black text-white text-sm">Gênio Explicador</span>
+            <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
          </div>
-         <div className="flex-1 overflow-y-auto flex flex-col gap-5 custom-scrollbar pb-2 pr-2">
-            {messages.length === 0 && <div className="text-slate-400 font-bold text-center py-4 text-xs mt-auto mb-auto">Alguma dúvida sobre o texto ao lado? Pergunte aqui!</div>}
+
+         <div className="flex-1 overflow-y-auto flex flex-col gap-4 custom-scrollbar pb-2 pr-1">
+            {messages.length === 0 && (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 gap-4 opacity-40">
+                <HelpCircle className="w-10 h-10 text-slate-500" />
+                <p className="text-slate-400 font-bold text-xs leading-relaxed uppercase tracking-tighter">
+                  Alguma dúvida sobre o seu <br/> documento? O Gênio ajuda!
+                </p>
+              </div>
+            )}
             {messages.map((m: any, i: number) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                 <div className={`max-w-[88%] p-5 rounded-[24px] text-[13px] leading-relaxed font-bold shadow-sm transition-all ${
+                 <div className={`max-w-[85%] p-4 rounded-[20px] text-[12px] leading-relaxed font-bold shadow-md transition-all ${
                    m.role === 'user' 
                      ? 'bg-[#22C55E] text-white rounded-tr-sm' 
-                     : 'bg-white/5 text-slate-200 rounded-tl-sm border border-white/5'
+                     : 'bg-white/10 text-slate-100 rounded-tl-sm border border-white/5 backdrop-blur-sm'
                  }`}>
                    <Markdown>{m.content}</Markdown>
                  </div>
               </div>
             ))}
-            {chatLoading && <div className="text-green-500 text-[10px] font-black animate-pulse flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin"/> LENDO DOCUMENTO...</div>}
+            {chatLoading && (
+              <div className="flex justify-start">
+                <div className="bg-white/5 border border-white/5 px-4 py-2.5 rounded-2xl flex items-center gap-3">
+                  <Loader2 className="w-3.5 h-3.5 text-green-500 animate-spin"/>
+                  <span className="text-green-500 text-[10px] font-black uppercase tracking-widest">Pensando...</span>
+                </div>
+              </div>
+            )}
             <div ref={chatEndRef} />
          </div>
-         <form onSubmit={handleSendMessage} className="relative group transition-all shrink-0">
-            <input value={input} onChange={e => setInput(e.target.value)} type="text" placeholder="Faça uma pergunta..." className="w-full bg-white/5 border border-white/10 px-6 py-4 rounded-[20px] text-[14px] font-bold text-white shadow-inner outline-none focus:border-green-500/50 focus:bg-white/10 transition-colors" />
-            <button type="submit" className="absolute right-2 top-2 p-2.5 bg-[#22C55E] hover:bg-green-400 rounded-xl text-white shadow-xl active:scale-95 transition-all"><Send className="w-4 h-4" /></button>
+
+         <form onSubmit={handleSendMessage} className="relative mt-2 shrink-0 group">
+            <input 
+              value={input} 
+              onChange={e => setInput(e.target.value)} 
+              type="text" 
+              placeholder="Digite sua dúvida..." 
+              className="w-full bg-white/5 border border-white/10 px-5 py-3.5 rounded-2xl text-[13px] font-bold text-white shadow-inner outline-none focus:border-green-500/40 focus:bg-white/10 transition-all placeholder:text-slate-600" 
+            />
+            <button 
+              type="submit" 
+              disabled={!input.trim() || chatLoading}
+              className="absolute right-1.5 top-1.5 p-2 bg-[#22C55E] hover:bg-green-400 disabled:opacity-50 disabled:hover:bg-[#22C55E] rounded-xl text-white shadow-lg active:scale-95 transition-all"
+            >
+              <Send className="w-3.5 h-3.5" />
+            </button>
          </form>
+         
+         <div className="mt-3 text-[9px] text-slate-500 font-bold text-center uppercase tracking-widest opacity-40">
+           Inteligência Artificial ExplicaFácil
+         </div>
       </div>
     </div>
   );
@@ -1278,6 +1369,54 @@ function CheckoutOption({ icon: Icon, label, active, onClick }: any) {
     <div onClick={onClick} className={`p-5 rounded-3xl border-2 flex flex-col items-center gap-3 cursor-pointer transition-all ${active ? 'border-green-500 bg-green-50/20' : 'border-slate-50 bg-white hover:border-slate-100'}`}>
        <Icon className={active ? 'text-green-600' : 'text-slate-300'} />
        <span className={`text-[10px] font-black uppercase tracking-widest ${active ? 'text-green-700' : 'text-slate-400'}`}>{label}</span>
+    </div>
+  );
+}
+
+function ScreenTermos({ onBack }: any) {
+  return (
+    <div className="bg-white p-12 rounded-[40px] shadow-sm min-h-[80vh] flex flex-col gap-8">
+      <div className="flex items-center gap-4">
+        <button onClick={onBack} className="p-3 bg-slate-50 hover:bg-slate-100 rounded-2xl transition-colors"><ArrowLeft className="text-slate-400" /></button>
+        <h2 className="text-3xl font-black text-[#1E293B]">Termos de Uso</h2>
+      </div>
+      <div className="flex-1 overflow-y-auto custom-scrollbar markdown-content text-slate-600">
+        <Markdown>{`
+# Termos de Uso - ExplicaFácil
+
+Aviso: Este conteúdo é um modelo base e deve ser revisado por um advogado.
+
+### Cláusulas Principais:
+
+1. **Serviço**: O ExplicaFácil utiliza IA para análise de documentos. A precisão não é garantida.
+2. **Responsabilidade**: O usuário é dono dos dados enviados e garante ter direito legal sobre eles.
+3. **Pagamentos**: Créditos comprados são vinculados à conta e não reembolsáveis após o uso.
+4. **Uso Proibido**: Proibido usar para documentos ilegais, difamatórios ou que violem direitos autorais.
+        `}</Markdown>
+      </div>
+    </div>
+  );
+}
+
+function ScreenPrivacidade({ onBack }: any) {
+  return (
+    <div className="bg-white p-12 rounded-[40px] shadow-sm min-h-[80vh] flex flex-col gap-8">
+      <div className="flex items-center gap-4">
+        <button onClick={onBack} className="p-3 bg-slate-50 hover:bg-slate-100 rounded-2xl transition-colors"><ArrowLeft className="text-slate-400" /></button>
+        <h2 className="text-3xl font-black text-[#1E293B]">Política de Privacidade</h2>
+      </div>
+      <div className="flex-1 overflow-y-auto custom-scrollbar markdown-content text-slate-600">
+        <Markdown>{`
+# Política de Privacidade - ExplicaFácil
+
+**Conformidade LGPD:**
+
+1. **Dados Coletados**: E-mail (via Google Auth) e metadados de uso para melhoria do serviço.
+2. **Finalidade**: Autenticação, gestão de créditos e suporte técnico.
+3. **Segurança**: Dados criptografados em repouso (Supabase) e em trânsito (SSL).
+4. **Direitos**: O usuário pode solicitar a exclusão total de seus dados a qualquer momento via suporte.
+        `}</Markdown>
+      </div>
     </div>
   );
 }
