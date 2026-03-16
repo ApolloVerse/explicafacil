@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY?.trim() || "";
 if (!apiKey) {
   console.warn("[GEMINI] VITE_GEMINI_API_KEY não foi encontrada nas variáveis de ambiente!");
 }
