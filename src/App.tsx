@@ -479,7 +479,7 @@ export default function App() {
               </div>
            </div>
            <div className="mt-4 text-center">
-             <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">v1.3</span>
+             <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">v1.5</span>
            </div>
         </div>
       </aside>
@@ -532,7 +532,7 @@ export default function App() {
                   ))}
                 </nav>
                 <div className="p-6 text-center border-t border-slate-50">
-                   <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">v1.3</span>
+                   <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">v1.5</span>
                 </div>
               </motion.div>
             </>
@@ -650,7 +650,7 @@ function ScreenAuth({ onLoginGoogle }: any) {
            <a href="/privacidade" className="text-[#22C55E] hover:underline"> Privacidade</a>
         </p>
         <div className="mt-4">
-           <span className="text-[10px] font-bold text-slate-200 uppercase tracking-widest">v1.3</span>
+           <span className="text-[10px] font-bold text-slate-200 uppercase tracking-widest">v1.5</span>
         </div>
       </motion.div>
     </div>
