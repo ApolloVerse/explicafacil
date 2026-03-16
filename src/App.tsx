@@ -418,7 +418,7 @@ export default function App() {
                 
                 await supabase.from('payments').insert({
                   user_id: session.user.id,
-                  amount: 19.90,
+                  amount: 9.90,
                   method: 'pix'
                 });
 
@@ -1044,7 +1044,7 @@ function ScreenPlanos({ profile, onSelect, onBack }: any) {
             <div className="absolute -top-4 -right-2 bg-[#22C55E] text-white px-6 py-2.5 rounded-full text-[11px] font-black uppercase tracking-[2px] shadow-xl">MELHOR VALOR</div>
             <span className="text-xs font-black text-green-500 tracking-[3px] uppercase mb-4 block">Premium</span>
             <div className="flex items-baseline gap-2 mb-10">
-               <span className="text-5xl font-black tracking-tighter">R$ 19,90</span>
+               <span className="text-5xl font-black tracking-tighter">R$ 9,90</span>
                <span className="text-slate-400 font-bold text-lg">/mês</span>
             </div>
             <ul className="flex flex-col gap-5 mb-12 flex-1">
@@ -1127,7 +1127,7 @@ function ScreenPagamento({ user, session, onBack, onConfirm }: any) {
          <div className="flex items-center justify-between">
             <div className="flex flex-col gap-1">
                <span className="text-sm font-black text-slate-300 uppercase">Total a pagar</span>
-               <span className="text-4xl md:text-5xl font-black text-[#1E293B]">R$ 19,90</span>
+               <span className="text-4xl md:text-5xl font-black text-[#1E293B]">R$ 9,90</span>
             </div>
             <div className="w-16 h-16 md:w-20 md:h-20 bg-green-50 rounded-3xl flex items-center justify-center"><CreditCard className="text-green-500 w-8 h-8 md:w-10 md:h-10" /></div>
          </div>

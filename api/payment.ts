@@ -44,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           'X-Idempotency-Key': `pix-${user.id}-${Date.now()}`
         },
         body: JSON.stringify({
-          transaction_amount: 19.90,
+          transaction_amount: 9.90,
           description: 'ExplicaFácil - Plano Premium',
           payment_method_id: 'pix',
           payer: { email: email || user.email }
