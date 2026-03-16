@@ -1,0 +1,6 @@
+
+ name                       value               environments                        created    
+ VITE_SUPABASE_URL          Encrypted           Production, Preview, Development    2d ago     
+ VITE_SUPABASE_ANON_KEY     Encrypted           Production, Preview, Development    2d ago     
+ GEMINI_API_KEY             Encrypted           Production, Preview, Development    2d ago     
+
